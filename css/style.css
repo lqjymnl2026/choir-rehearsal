@@ -629,8 +629,8 @@ body {
 
 /* ========== Conductor only visibility ========== */
 .conductor-only { display: none !important; }
-body.is-conductor .conductor-only { display: flex !important; }
-body.is-conductor .conductor-only.tab-content.active { display: block !important; }
+body.is-conductor .tab-btn.conductor-only { display: flex !important; }
+body.is-conductor .tab-content.conductor-only.active { display: block !important; }
 
 /* ========== Empty State ========== */
 .empty-state {
