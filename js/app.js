@@ -16,6 +16,8 @@
     playbackIntervals: new Map(),
     pendingSongs: [],
     editingId: null,
+    pendingHwSongs: [],
+    pendingHwManual: { score: null, audio: null },
   };
 
   const VOICE_LABELS = { soprano:'女高音', alto:'女低音', tenor:'男高音', bass:'男低音' };
@@ -26,7 +28,11 @@
 
   function getMembers() { return load('members', []); }
   function saveMembers(m) { store('members', m); }
-  function getRehearsals() { return load('rehearsals', []); }
+  function getRehearsals() {
+    // 初始数据为空：不再内置任何歌曲/排练（旧版默认 r1/r2 一并清除）
+    const rs = load('rehearsals', []);
+    return rs.filter(r => r.id !== 'r1' && r.id !== 'r2');
+  }
   function saveRehearsals(r) { store('rehearsals', r); }
   function getHomework() { return load('homework', []); }
   function saveHomework(h) { store('homework', h); }
@@ -34,7 +40,7 @@
   function saveRecordings(r) { store('recordings', r); }
   function getCheckins() { return load('checkins', {}); }
   function saveCheckins(c) { store('checkins', c); }
-  function getVenue() { return load('venue', { name:'教会一楼诗班室', lat:null, lng:null, radius:500 }); }
+  function getVenue() { return load('venue', { name:'', lat:null, lng:null, radius:500 }); }
   function saveVenue(v) { store('venue', v); }
   function getAttendance() { return load('attendance', []); }
   function saveAttendance(a) { store('attendance', a); }
@@ -364,6 +370,9 @@
     // 系统化 90 分钟排练流程（含本周教案）
     html += renderRehearsalFlow();
 
+    // 本周教案（学员端重点查看）
+    html += renderThisWeekPlan();
+
     // 节期选歌提示
     html += renderSeasonHint();
 
@@ -421,6 +430,27 @@
       att += `<label class="att-upload"><i class="fas fa-upload"></i> 上传音频<input type="file" accept="audio/*" style="display:none" onchange="app.uploadAttachment('${r.id}',${idx},'audio',this.files[0])"></label>`;
     }
     return `<li><i class="fas fa-file-audio"></i> ${esc(s.name)} <span style="color:var(--text-muted);font-size:12px;">${esc(s.type||'')}</span>${att ? `<div class="song-att">${att}</div>` : ''}</li>`;
+  }
+
+  // ---------- 本周教案卡片（学员端查看） ----------
+  function renderThisWeekPlan() {
+    if (typeof PLANS_DATA === 'undefined' || !PLANS_DATA.LESSONS) return '';
+    const wk = currentPlanWeek();
+    if (!wk) return '';
+    let st = null;
+    try { st = JSON.parse(localStorage.getItem('choir_lesson_settings') || 'null'); } catch (e) {}
+    const lessonId = (st && st.currentLesson) ? st.currentLesson : wk.lesson.id;
+    const lesson = PLANS_DATA.LESSONS[Math.min(Math.max(lessonId, 1), 52) - 1];
+    return `
+      <div class="card" style="border-left:4px solid var(--success);padding:18px 20px;margin-top:12px;">
+        <div class="card-title" style="font-size:16px;"><i class="fas fa-book-open" style="color:var(--success);"></i> 本周教案 · W${wk.weekNum} ${esc(wk.label)}</div>
+        <div style="font-size:13px;color:var(--text-muted);margin:8px 0;">课次：<strong>${lesson.title}</strong> · ${esc(lesson.focus)}</div>
+        <div style="font-size:13px;"><i class="fas fa-bible" style="color:var(--primary);"></i> 灵修：${esc(wk.devotion.verse)}（${esc(wk.devotion.theme)}）</div>
+        <div style="font-size:13px;margin-top:6px;"><i class="fas fa-fire" style="color:#E17055;"></i> 练声曲：${lesson.vocalise.map(v=>esc(v.title)).join('、')}</div>
+        <div style="font-size:13px;margin-top:6px;"><i class="fas fa-eye" style="color:#0984E3;"></i> 简谱视唱：${esc(lesson.sightReading.title)}（${esc(lesson.sightReading.key)} · ${esc(lesson.sightReading.meter)}）</div>
+        ${wk.songs && wk.songs.length ? `<div style="font-size:13px;margin-top:6px;"><i class="fas fa-music" style="color:var(--accent);"></i> 本周曲目：${wk.songs.map(s=>esc(s.title)).join('、')}</div>` : ''}
+        <a href="plans.html" style="display:inline-block;margin-top:10px;font-size:12.5px;color:var(--primary);">查看完整教案 →</a>
+      </div>`;
   }
 
   // ---------- 系统化排练流程（含本周教案详细内容） ----------
@@ -584,7 +614,7 @@
           <div class="hw-header"><span class="hw-title">${esc(hw.title)}</span><span class="hw-status ${statusClass}">${statusText}</span></div>
           <div class="hw-desc">
             <div><i class="fas fa-info-circle"></i> ${esc(hw.description||'')}</div>
-            ${hw.songs && hw.songs.length ? `<div style="margin-top:4px;"><i class="fas fa-music"></i> ${hw.songs.map(esc).join('、')}</div>` : ''}
+            ${hw.songs && hw.songs.length ? `<div style="margin-top:6px;"><i class="fas fa-music"></i> 曲目：${hw.songs.map((s,si)=>`${esc(s.name)}${s.score?` <a class="att-link" onclick="app.viewHwAttachment('${hw.id}',${si},'score')">[歌谱]</a>`:''}${s.audio?` <a class="att-link" onclick="app.viewHwAttachment('${hw.id}',${si},'audio')">[音频]</a>`:''}`).join('；')}</div>` : ''}
             <div style="margin-top:4px;"><i class="fas fa-hourglass-half"></i> 截止：${esc(dueDate)}</div>
           </div>
           ${!isCond ? (myRecording ? `
@@ -608,6 +638,31 @@
   function renderCheckin() {
     const container = document.getElementById('tab-checkin');
     const me = state.currentUser;
+
+    // 指挥无需打卡：只查看今日考勤概览
+    if (me.role === 'conductor') {
+      const att = getAttendance();
+      const today = todayStr();
+      const todayAtt = att.filter(a => a.date === today);
+      const students = getMembers().filter(m => m.role === 'student');
+      const absent = students.filter(m => !todayAtt.some(a => a.name === m.name));
+      container.innerHTML = `
+        <div class="section-title"><i class="fas fa-check-circle"></i> 排练考勤</div>
+        <div class="card" style="border-left:4px solid var(--primary);">
+          <div class="card-title"><i class="fas fa-user-shield"></i> 指挥无需打卡</div>
+          <div style="font-size:13px;color:var(--text-muted);margin:6px 0;">指挥不需要定位打卡；考勤管理（补录/标记/导出学员册）请到「管理」页。</div>
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="fas fa-map-pin"></i> 今日签到（${today}）· ${todayAtt.length} 人</div>
+          ${todayAtt.length ? todayAtt.map(a => `<div style="padding:6px 0;border-bottom:1px dashed var(--border);font-size:13px;">✅ ${esc(a.name)} · ${VOICE_LABELS[a.voicePart]||''} · ${esc(a.time)} · ${esc(a.status)}</div>`).join('') : `<div class="empty-state"><i class="fas fa-calendar-check"></i><p>今日暂无签到</p></div>`}
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="fas fa-user-clock"></i> 未签到学员（${absent.length} 人）</div>
+          ${absent.length ? absent.map(m => `<div style="padding:5px 0;font-size:13px;color:var(--text-muted);">— ${esc(m.name)}（${VOICE_LABELS[m.voicePart]||''}）</div>`).join('') : '<div style="font-size:13px;color:var(--success);">全部已签到 ✅</div>'}
+        </div>`;
+      return;
+    }
+
     const venue = getVenue();
     const att = getAttendance();
     const today = todayStr();
@@ -746,9 +801,12 @@
         <div style="font-size:12px;color:var(--text-muted);margin-top:8px;" id="venue-coords">${venue.lat!=null?`当前坐标：${venue.lat.toFixed(5)}, ${venue.lng.toFixed(5)}`:'尚未设置坐标'}</div>
       </div>`;
 
-    // 考勤表
-    html += `<div class="section-title" style="margin-top:24px;"><i class="fas fa-clipboard-list"></i> 排练考勤表</div>`;
+    // 考勤表（含考勤管理）
+    html += `<div class="section-title" style="margin-top:24px;"><i class="fas fa-clipboard-list"></i> 排练考勤表（点击单元格可标记/取消）</div>`;
     html += renderAttendanceTable(att, members);
+
+    // 学员详细统计
+    html += renderStudentStats();
 
     // 成员分组
     ['soprano','alto','tenor','bass'].forEach(part => {
@@ -758,7 +816,7 @@
       pm.forEach(m => {
         const mc = (checkins[m.name]||[]).filter(d=>d===todayStr()).length;
         const mr = recordings.filter(r=>r.userName===m.name).length;
-        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);"><div><div style="font-weight:600;">${esc(m.name)}</div><div style="font-size:12px;color:var(--text-muted);">${m.phone?esc(m.phone)+' · ':''}练习打卡 ${mc>0?'✅':'—'} · 录音 ${mr} · 出勤 ${att.filter(a=>a.name===m.name).length}次</div></div><button class="btn btn-small btn-danger" onclick="app.removeMember('${esc(m.name).replace(/'/g,"\\'")}')"><i class="fas fa-trash"></i></button></div>`;
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);"><div><div style="font-weight:600;">${esc(m.name)}</div><div style="font-size:12px;color:var(--text-muted);">${m.phone?esc(m.phone)+' · ':''}练习打卡 ${mc>0?'✅':'—'} · 录音 ${mr} · 出勤 ${att.filter(a=>a.name===m.name).length}次</div></div><div style="display:flex;gap:4px;"><button class="btn btn-small btn-outline" onclick="app.showStudentDetail('${esc(m.name).replace(/'/g,"\\'")}')"><i class="fas fa-chart-line"></i> 详情</button><button class="btn btn-small btn-danger" onclick="app.removeMember('${esc(m.name).replace(/'/g,"\\'")}')"><i class="fas fa-trash"></i></button></div></div>`;
       });
       html += `</div>`;
     });
@@ -768,9 +826,23 @@
   function renderAttendanceTable(att, members) {
     const dates = [...new Set(att.map(a => a.date))].sort().reverse();
     const students = members.filter(m => m.role === 'student');
-    if (!dates.length) return `<div class="empty-state"><i class="fas fa-clipboard-list"></i><p>暂无考勤记录，学员在「打卡」页定位打卡后这里会生成考勤表</p></div>`;
     const cnt = n => n >= 5 ? '#00B894' : (n >= 3 ? '#FDCB6E' : '#E17055');
-    let table = `<div style="overflow-x:auto;"><table class="att-table">
+    let table = '';
+    // 手动补录
+    table += `<div class="card" style="border-left:4px solid var(--secondary);">
+      <div class="card-title"><i class="fas fa-user-pen"></i> 考勤管理 · 手动补录</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <input type="date" id="att-date" value="${todayStr()}">
+        <select id="att-member">${students.map(m=>`<option value="${esc(m.name)}">${esc(m.name)}（${VOICE_LABELS[m.voicePart]||''}）</option>`).join('')}</select>
+        <button class="btn btn-small btn-primary" onclick="app.manualAttendance()"><i class="fas fa-user-check"></i> 补录签到</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-muted);margin-top:6px;">提示：点击表格中的 — / △ / ✓ 单元格，可手动标记或取消该学员当日考勤。</div>
+    </div>`;
+    if (!dates.length) {
+      table += `<div class="empty-state"><i class="fas fa-clipboard-list"></i><p>暂无考勤记录。学员在「打卡」页定位打卡后自动生成，也可用上方「手动补录」添加。</p></div>`;
+      return table;
+    }
+    table += `<div style="overflow-x:auto;"><table class="att-table">
       <tr><th>成员</th>${dates.map(d => `<th>${d.slice(5).replace('-','/')}</th>`).join('')}<th>出勤</th></tr>`;
     students.forEach(m => {
       const my = att.filter(a => a.name === m.name);
@@ -778,17 +850,111 @@
       dates.forEach(d => {
         const a = my.find(x => x.date === d);
         const ok = a && a.status === '已到排练现场';
-        table += `<td class="${ok?'att-ok':(a?'att-off':'')}" title="${a?esc(a.status)+(a.distance!=null?' '+a.distance+'m':'')+' '+a.time:'未签到'}">${ok?'✓':(a?'△':'—')}</td>`;
+        const title = a ? (a.status === '已到排练现场' ? '到场（点击取消）' : '异地/未定位（点击标记到场）') : '未签到（点击标记到场）';
+        table += `<td class="att-cell ${ok?'att-ok':(a?'att-off':'')}" title="${title}" onclick="app.toggleAttendance('${d}','${esc(m.name).replace(/'/g,"\\'")}')">${ok?'✓':(a?'△':'—')}</td>`;
       });
       table += `<td style="font-weight:700;color:${cnt(my.length)};">${my.length}/${dates.length}</td></tr>`;
     });
     table += `</table></div>`;
     table += `<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
-      <button class="btn btn-small btn-outline" onclick="app.exportAttendance()"><i class="fas fa-file-csv"></i> 导出CSV</button>
+      <button class="btn btn-small btn-outline" onclick="app.exportAttendance()"><i class="fas fa-file-csv"></i> 导出考勤CSV</button>
+      <button class="btn btn-small btn-outline" onclick="app.exportRoster()"><i class="fas fa-users"></i> 导出学员册</button>
       <button class="btn btn-small btn-outline" onclick="window.print()"><i class="fas fa-print"></i> 打印</button>
-      <span style="font-size:12px;color:var(--text-muted);align-self:center;">✓ 现场签到 · △ 异地/未定位 · — 未签到</span>
+      <span style="font-size:12px;color:var(--text-muted);align-self:center;">✓ 到场 · △ 异地/未定位 · — 未签到</span>
     </div>`;
     return table;
+  }
+
+  // ============================================================
+  //  学员详细统计 / 考勤管理 / 导出学员册
+  // ============================================================
+  function renderStudentStats() {
+    const members = getMembers().filter(m => m.role === 'student');
+    const att = getAttendance();
+    const checkins = getCheckins();
+    const recordings = getRecordings();
+    const homework = getHomework();
+    let html = `<div class="section-title" style="margin-top:24px;"><i class="fas fa-chart-line"></i> 学员详细统计</div><div class="card">`;
+    if (!members.length) html += `<div class="empty-state"><i class="fas fa-users"></i><p>暂无学员</p></div>`;
+    members.forEach(m => {
+      const myAtt = att.filter(a => a.name === m.name);
+      const myCheck = (checkins[m.name] || []).length;
+      const myRec = recordings.filter(r => r.userName === m.name);
+      const hwCount = homework.filter(hw => recordings.some(r => r.homeworkId === hw.id && r.userName === m.name)).length;
+      html += `<div class="stu-stat">
+        <div style="flex:1;">
+          <div style="font-weight:700;">${esc(m.name)} <span style="font-size:11px;color:var(--text-muted);font-weight:400;">${VOICE_LABELS[m.voicePart]||''}${m.phone?' · '+esc(m.phone):''}</span></div>
+          <div style="font-size:11.5px;color:var(--text-muted);">出勤 ${myAtt.length}次 · 练习打卡 ${myCheck}天 · 录音 ${myRec.length} · 交作业 ${hwCount}</div>
+        </div>
+        <button class="btn btn-small btn-outline" onclick="app.showStudentDetail('${esc(m.name).replace(/'/g,"\\'")}')"><i class="fas fa-chart-line"></i> 详情</button>
+      </div>`;
+    });
+    html += `</div>`;
+    return html;
+  }
+  function showStudentDetail(name) {
+    const m = getMembers().find(x => x.name === name);
+    const att = getAttendance().filter(a => a.name === name);
+    const checkins = (getCheckins()[name] || []).slice().sort().reverse();
+    const recs = getRecordings().filter(r => r.userName === name).sort((a,b) => b.ts - a.ts);
+    const homework = getHomework();
+    const hwCount = homework.filter(hw => recs.some(r => r.homeworkId === hw.id)).length;
+    const body = `
+      <p style="font-size:15px;"><strong>${esc(name)}</strong> · ${VOICE_LABELS[m?.voicePart]||''}${m?.phone?` · ${esc(m.phone)}`:''}</p>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-num">${att.length}</div><div class="stat-label">出勤次数</div></div>
+        <div class="stat-card"><div class="stat-num">${checkins.length}</div><div class="stat-label">练习打卡</div></div>
+        <div class="stat-card"><div class="stat-num">${recs.length}</div><div class="stat-label">录音数</div></div>
+        <div class="stat-card"><div class="stat-num">${hwCount}</div><div class="stat-label">交作业</div></div>
+      </div>
+      <div style="margin-top:12px;"><strong><i class="fas fa-clipboard-check"></i> 出勤记录（${att.length}）</strong>
+        <ul style="margin:4px 0 0;padding-left:20px;font-size:13px;">${att.length ? att.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(a => `<li>${esc(a.date)} ${esc(a.time)} · ${esc(a.status)}</li>`).join('') : '<li style="color:var(--text-muted)">暂无</li>'}</ul>
+      </div>
+      <div style="margin-top:10px;"><strong><i class="fas fa-book-open"></i> 练习打卡（${checkins.length}天）</strong>
+        <div style="font-size:12.5px;color:var(--text-muted);margin-top:4px;">${checkins.length ? checkins.map(d=>d.slice(5)).join('、') : '暂无'}</div>
+      </div>
+      <div style="margin-top:10px;"><strong><i class="fas fa-microphone"></i> 录音（${recs.length}）</strong>
+        <ul style="margin:4px 0 0;padding-left:20px;font-size:13px;">${recs.length ? recs.slice(0,10).map(r => `<li>${esc(r.date)} · ${esc(r.title)} · ${esc(r.duration)}${r.feedback?' · 💬 '+esc(r.feedback):''}</li>`).join('') : '<li style="color:var(--text-muted)">暂无</li>'}</ul>
+      </div>`;
+    showModal('学员详情：' + name, body);
+  }
+  function toggleAttendance(date, name) {
+    const att = getAttendance();
+    const i = att.findIndex(a => a.date === date && a.name === name);
+    if (i >= 0) { att.splice(i, 1); toast('已取消 ' + name + ' 的考勤'); }
+    else {
+      const m = getMembers().find(x => x.name === name);
+      att.push({ date, name, voicePart: m ? m.voicePart : '', time: '手动', status: '已到排练现场', manual: true });
+      toast('已标记 ' + name + ' 到场');
+    }
+    saveAttendance(att); renderManage();
+  }
+  function manualAttendance() {
+    const date = document.getElementById('att-date').value;
+    const name = document.getElementById('att-member').value;
+    if (!date || !name) { toast('请选择日期和学员'); return; }
+    const att = getAttendance();
+    if (att.some(a => a.date === date && a.name === name)) { toast('该学员当天已签到'); return; }
+    const m = getMembers().find(x => x.name === name);
+    att.push({ date, name, voicePart: m ? m.voicePart : '', time: '手动补录', status: '已到排练现场', manual: true });
+    saveAttendance(att); toast('已补录 ' + name + '（' + date + '）'); renderManage();
+  }
+  function exportRoster() {
+    const members = getMembers().filter(m => m.role === 'student');
+    const att = getAttendance();
+    const checkins = getCheckins();
+    const recordings = getRecordings();
+    const homework = getHomework();
+    let csv = '\uFEFF姓名,声部,手机号,出勤次数,练习打卡天数,录音数,交作业数\n';
+    members.forEach(m => {
+      const hwCount = homework.filter(hw => recordings.some(r => r.homeworkId === hw.id && r.userName === m.name)).length;
+      csv += `${m.name},${VOICE_LABELS[m.voicePart]||''},${m.phone||''},${att.filter(a=>a.name===m.name).length},${(checkins[m.name]||[]).length},${recordings.filter(r=>r.userName===m.name).length},${hwCount}\n`;
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = `诗班学员册-${todayStr()}.csv`;
+    a.click();
+    toast('学员册已导出');
   }
 
   // ============================================================
@@ -1282,13 +1448,95 @@
   //  Homework / Members
   // ============================================================
   function addHomework() {
-    showModal('布置作业', `<label>标题</label><input type="text" id="hw-title" placeholder="本周声部练习"><label>要求</label><textarea id="hw-desc" placeholder="描述练习要求"></textarea><label>曲目（逗号分隔）</label><input type="text" id="hw-songs" placeholder="歌名1, 歌名2"><label>截止</label><input type="date" id="hw-due"><button class="btn btn-primary" onclick="app.saveHomework()" style="width:100%;margin-top:8px;">发布</button>`);
+    state.pendingHwSongs = [];
+    state.pendingHwManual = { score: null, audio: null };
+    showModal('布置作业', `
+      <label>标题</label><input type="text" id="hw-title" placeholder="如：本周声部练习">
+      <label>歌曲（从已上传歌曲调入，也可手动添加）</label>
+      <div id="hw-pick-source">${renderHwPickSource()}</div>
+      <div id="hw-song-list">${renderHwSongs()}</div>
+      <label>手动添加歌曲</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <input type="text" id="hw-new-name" placeholder="歌名" style="flex:1;min-width:100px;">
+        <label class="att-upload"><i class="fas fa-file-image"></i> 歌谱<input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="app.hwManualFile('score',this)"></label>
+        <label class="att-upload"><i class="fas fa-headphones"></i> 音频<input type="file" accept="audio/*" style="display:none" onchange="app.hwManualFile('audio',this)"></label>
+        <button class="btn btn-small btn-primary" onclick="app.hwManualAdd()"><i class="fas fa-plus"></i> 添加</button>
+      </div>
+      <label>要求</label><textarea id="hw-desc" placeholder="描述练习要求"></textarea>
+      <label>截止</label><input type="date" id="hw-due">
+      <button class="btn btn-primary" onclick="app.saveHomework()" style="width:100%;margin-top:8px;">发布</button>`);
+  }
+  function hwSourceSongs() {
+    const out = [];
+    const repo = getRepertoire();
+    ['Q1','Q2','Q3','Q4'].forEach(q => (repo[q] || []).forEach(s => out.push({ name: s.name, src: '年度曲目库', score: null, audio: null })));
+    getRehearsals().forEach(r => (r.songs || []).forEach(s => out.push({ name: s.name, src: r.title || '排练', score: s.score || null, audio: s.audio || null })));
+    const seen = new Set();
+    return out.filter(s => { if (!s.name || seen.has(s.name)) return false; seen.add(s.name); return true; });
+  }
+  function renderHwPickSource() {
+    const songs = hwSourceSongs();
+    if (!songs.length) return `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">暂无已上传歌曲（可先在「年度曲目库」或排练中添加，或在下方手动添加）</div>`;
+    return `<div class="hw-src-list">${songs.map((s,i)=>`<button class="hw-src-chip ${state.pendingHwSongs.some(x=>x.name===s.name)?'active':''}" onclick="app.hwToggleSource(${i})">${esc(s.name)}</button>`).join('')}</div>`;
+  }
+  function hwToggleSource(i) {
+    const src = hwSourceSongs();
+    const s = src[i]; if (!s) return;
+    const existing = state.pendingHwSongs.find(x => x.name === s.name);
+    if (existing) state.pendingHwSongs = state.pendingHwSongs.filter(x => x.name !== s.name);
+    else state.pendingHwSongs.push({ name: s.name, score: s.score, audio: s.audio });
+    document.getElementById('hw-pick-source').innerHTML = renderHwPickSource();
+    document.getElementById('hw-song-list').innerHTML = renderHwSongs();
+  }
+  function renderHwSongs() {
+    if (!state.pendingHwSongs.length) return `<div style="font-size:12px;color:var(--text-muted);margin:6px 0;">尚未选择歌曲</div>`;
+    return `<div class="hw-picked-list">${state.pendingHwSongs.map((s,i)=>`<div class="hw-picked"><i class="fas fa-music"></i> ${esc(s.name)}${s.score?' <em>歌谱✓</em>':''}${s.audio?' <em>音频✓</em>':''} <button class="btn btn-small btn-danger" onclick="app.hwDelSong(${i})"><i class="fas fa-trash"></i></button></div>`).join('')}</div>`;
+  }
+  async function hwManualFile(kind, input) {
+    const file = input && input.files && input.files[0]; if (!file) return;
+    const fid = uuid();
+    try { await dbPut(fid, file); } catch(e) { toast('文件保存失败'); return; }
+    state.pendingHwManual[kind] = { fid, name: file.name, type: file.type, size: file.size };
+    toast('已暂存' + (kind === 'score' ? '歌谱' : '音频') + '，点「添加」加入作业');
+  }
+  function hwManualAdd() {
+    const name = document.getElementById('hw-new-name').value.trim();
+    if (!name) { toast('请输入歌名'); return; }
+    state.pendingHwSongs.push({ name, score: state.pendingHwManual.score || null, audio: state.pendingHwManual.audio || null });
+    state.pendingHwManual = { score: null, audio: null };
+    document.getElementById('hw-new-name').value = '';
+    document.getElementById('hw-song-list').innerHTML = renderHwSongs();
+    toast('已添加歌曲');
+  }
+  function hwDelSong(i) { state.pendingHwSongs.splice(i, 1); document.getElementById('hw-song-list').innerHTML = renderHwSongs(); }
+  async function viewHwAttachment(hwId, idx, kind) {
+    const hw = getHomework().find(x => x.id === hwId); if (!hw) return;
+    const s = (hw.songs || [])[idx]; const att = s && s[kind]; if (!att || !att.fid) return;
+    const blob = await dbGet(att.fid); if (!blob) { toast('文件不存在'); return; }
+    const url = URL.createObjectURL(blob);
+    const isImg = blob.type.startsWith('image/');
+    const body = isImg ? `<img src="${url}" style="max-width:100%;border-radius:10px;">` : (blob.type === 'application/pdf' ? `<iframe src="${url}" style="width:100%;height:70vh;border:none;"></iframe>` : `<audio controls src="${url}" style="width:100%;"></audio>`);
+    showModal((kind === 'score' ? '歌谱' : '音频') + '：' + s.name, body + `<div style="margin-top:12px;text-align:center;"><a href="${url}" download="${esc(att.name)}" class="btn btn-small btn-primary" style="text-decoration:none;"><i class="fas fa-download"></i> 下载</a></div>`);
   }
   function saveHomework() {
-    const hw = { id:uuid(), title:document.getElementById('hw-title').value||'作业', description:document.getElementById('hw-desc').value, songs:document.getElementById('hw-songs').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean), dueDate:document.getElementById('hw-due').value, ts:Date.now() };
-    const h = getHomework(); h.unshift(hw); saveHomework(h); hideModal(); toast('已发布！'); renderAll();
+    const hw = {
+      id: uuid(),
+      title: document.getElementById('hw-title').value || '作业',
+      description: document.getElementById('hw-desc').value,
+      songs: state.pendingHwSongs,
+      dueDate: document.getElementById('hw-due').value,
+      ts: Date.now()
+    };
+    const h = getHomework(); h.unshift(hw); saveHomework(h); hideModal(); state.pendingHwSongs = [];
+    toast('已发布！'); renderAll();
   }
-  function deleteHomework(id) { if (!confirm('确定删除？')) return; saveHomework(getHomework().filter(h=>h.id!==id)); saveRecordings(getRecordings().filter(r=>r.homeworkId!==id)); toast('已删除'); renderAll(); }
+  function deleteHomework(id) {
+    if (!confirm('确定删除？')) return;
+    const hw = getHomework().find(x => x.id === id);
+    if (hw) (hw.songs || []).forEach(s => { if (s.score) dbDel(s.score.fid).catch(()=>{}); if (s.audio) dbDel(s.audio.fid).catch(()=>{}); });
+    saveHomework(getHomework().filter(h => h.id !== id));
+    saveRecordings(getRecordings().filter(r => r.homeworkId !== id)); toast('已删除'); renderAll();
+  }
   function saveFeedback(rid) { const input = document.getElementById('feedback-'+rid); if (!input) return; const rs = getRecordings(); const r = rs.find(x=>x.id===rid); if (r) { r.feedback = input.value; saveRecordings(rs); toast('评语已保存'); } }
   function reviewHomework(hwId) { switchTab('review'); }
   function addMember() {
@@ -1318,9 +1566,11 @@
     saveStartLesson, saveCurrentLesson, setCurrentLesson,
     addSongRow, delSongRow, songInput, songFile, clearSongFiles,
     addHomework, saveHomework, deleteHomework, saveFeedback,
+    hwToggleSource, hwManualFile, hwManualAdd, hwDelSong, viewHwAttachment,
     addMember, saveNewMember, removeMember, filterRecordings, reviewHomework,
     uploadAttachment, deleteAttachment, viewAttachment,
-    useMyLocation, saveVenue, exportAttendance,
+    useMyLocation, saveVenue, exportAttendance, exportRoster,
+    showStudentDetail, toggleAttendance, manualAttendance,
     openRegister, saveRegister
   };
   document.addEventListener('DOMContentLoaded', init);
