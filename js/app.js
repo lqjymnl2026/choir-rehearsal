@@ -40,6 +40,8 @@
   function saveAttendance(a) { store('attendance', a); }
   function getRepertoire() { return load('repertoire', { Q1:[], Q2:[], Q3:[], Q4:[] }); }
   function saveRepertoire(r) { store('repertoire', r); }
+  function getLessonSettings() { return load('lesson_settings', { startLesson: 1, currentLesson: null }); }
+  function saveLessonSettings(s) { store('lesson_settings', s); }
 
   function fmt(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
   function todayStr() { return fmt(new Date()); }
@@ -424,6 +426,24 @@
   // ---------- 系统化排练流程（含本周教案详细内容） ----------
   function renderRehearsalFlow() {
     const wk = currentPlanWeek();
+    // 热身/视唱课次：默认按教案周次；指挥在后台选「当前课次」则优先
+    let warm = null, solf = null;
+    if (wk) {
+      warm = { title: wk.lesson ? wk.lesson.title : '', vocalise: wk.warmup.vocal };
+      solf = { title: wk.lesson ? wk.lesson.title : '', rhythm: wk.solfege.rhythm, interval: wk.solfege.interval, sightReading: wk.solfege.sightReading };
+    }
+    let lessonBadge = '';
+    if (typeof PLANS_DATA !== 'undefined' && PLANS_DATA.LESSONS) {
+      const st = getLessonSettings();
+      if (st.currentLesson) {
+        const L = PLANS_DATA.LESSONS[Math.min(Math.max(st.currentLesson, 1), 52) - 1];
+        warm = { title: L.title, vocalise: L.vocalise };
+        solf = { title: L.title, rhythm: L.rhythm, interval: L.interval, sightReading: L.sightReading };
+        lessonBadge = `<div style="font-size:12px;color:#B7791F;background:#FFF8E7;border:1px solid #F3D9A4;border-radius:8px;padding:5px 10px;margin-top:6px;"><i class="fas fa-book-reader"></i> 本周热身/视唱课次：<strong>${L.title}</strong>（指挥后台选用）</div>`;
+      } else if (wk) {
+        lessonBadge = `<div style="font-size:12px;color:var(--text-muted);margin-top:6px;"><i class="fas fa-book-reader"></i> 热身/视唱课次：<strong>${esc(warm.title)}</strong>（指挥可在「管理」选课）</div>`;
+      }
+    }
     let weekHtml = '';
     if (wk) {
       weekHtml = `
@@ -438,11 +458,12 @@
     <div class="card" style="border-left:4px solid var(--accent);padding:20px;">
       <div class="card-title" style="font-size:18px;"><i class="fas fa-clock" style="color:var(--accent);"></i> 排练流程 · 90分钟</div>
       <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">每次排练按以下五个环节系统进行，点击展开查看详细内容</div>
+      ${lessonBadge}
       ${weekHtml}
       <div class="flow-timeline">
         ${flowItem('0:00-0:05','灵修祷告','#E17055','fa-pray', flowDevotion(wk))}
-        ${flowItem('0:05-0:20','热身练声','#6C5CE7','fa-fire', flowWarmup(wk))}
-        ${flowItem('0:20-0:30','视唱练耳','#0984E3','fa-book-reader', flowSolfege(wk))}
+        ${flowItem('0:05-0:20','热身练声','#6C5CE7','fa-fire', flowWarmup(wk, warm))}
+        ${flowItem('0:20-0:30','视唱练耳','#0984E3','fa-book-reader', flowSolfege(wk, solf))}
         ${flowItem('0:30-1:20','曲目排练','#FDCB6E','fa-music', flowRehearsal(wk))}
         ${flowItem('1:20-1:30','串联录音','#00B894','fa-microphone-alt', flowRecord(wk))}
       </div>
@@ -473,9 +494,16 @@
     return `<p><strong>经文宣读</strong>— 简短灵修分享（主题/要点）— 为排练与事奉祷告 — 配合诗歌回应</p>`;
   }
 
-  function flowWarmup(wk) {
+  function flowWarmup(wk, warm) {
     let vocal = `<p><strong>声乐练习（8分钟）</strong>— 哼鸣、音阶琶音、元音转换、连音/跳音/顿音</p>`;
-    if (wk) {
+    if (warm && warm.vocalise && warm.vocalise.length) {
+      vocal = `<p><strong>练声曲（8分钟 · ${esc(warm.title)} · 附简谱）</strong></p>` + warm.vocalise.map(v => `
+        <div class="vocalise-item" style="margin-top:8px;">
+          <div class="v-title" style="font-size:12.5px;font-weight:700;color:var(--primary);">${v.id} ${esc(v.title)}（${esc(v.key)} · ${esc(v.meter)} · ${esc(v.tempo)} · ${esc(v.vowel)}）</div>
+          <div class="jianpu">${v.jianpu.map(l=>`<div class="jp-line">${esc(l)}</div>`).join('')}</div>
+          <div class="v-method" style="font-size:11.5px;color:var(--text-muted);">${esc(v.method)}</div>
+        </div>`).join('');
+    } else if (wk) {
       vocal = wk.warmup.vocal.map(v => `
         <div class="vocalise-item" style="margin-top:8px;">
           <div class="v-title" style="font-size:12.5px;font-weight:700;color:var(--primary);">${v.id} ${esc(v.title)}（${esc(v.key)} · ${esc(v.meter)} · ${esc(v.tempo)} · ${esc(v.vowel)}）</div>
@@ -490,14 +518,16 @@
       <p><strong>合唱热身</strong>— 和弦调音、各声部独立起音、节奏统一进入</p>`;
   }
 
-  function flowSolfege(wk) {
-    if (wk) return `
-      <p><strong>节奏训练：</strong>${esc(wk.solfege.rhythm.name)}</p>
-      <div class="jianpu" style="margin:4px 0;">${esc(wk.solfege.rhythm.jianpu)}</div>
-      <p><strong>音程/和弦训练：</strong>${esc(wk.solfege.interval)}</p>
-      <p><strong>简谱视唱：</strong>${esc(wk.solfege.sightReading.title)}（${esc(wk.solfege.sightReading.key)} · ${esc(wk.solfege.sightReading.meter)} · ${esc(wk.solfege.sightReading.tempo)}）</p>
-      <div class="jianpu" style="margin:4px 0;">${wk.solfege.sightReading.jianpu.map(l=>`<div class="jp-line">${esc(l)}</div>`).join('')}</div>
-      <p style="font-size:12px;color:var(--text-muted);">${esc(wk.solfege.sightReading.target)}</p>`;
+  function flowSolfege(wk, solf) {
+    const src = solf || (wk ? { title: wk.lesson?wk.lesson.title:'', rhythm: wk.solfege.rhythm, interval: wk.solfege.interval, sightReading: wk.solfege.sightReading } : null);
+    if (src) return `
+      <p style="font-size:12px;color:var(--text-muted);"><i class="fas fa-book-reader"></i> ${esc(src.title)}</p>
+      <p><strong>节奏训练：</strong>${esc(src.rhythm.name)}</p>
+      <div class="jianpu" style="margin:4px 0;">${esc(src.rhythm.jianpu)}</div>
+      <p><strong>音程/和弦训练：</strong>${esc(src.interval)}</p>
+      <p><strong>简谱视唱：</strong>${esc(src.sightReading.title)}（${esc(src.sightReading.key)} · ${esc(src.sightReading.meter)} · ${esc(src.sightReading.tempo)}）</p>
+      <div class="jianpu" style="margin:4px 0;">${src.sightReading.jianpu.map(l=>`<div class="jp-line">${esc(l)}</div>`).join('')}</div>
+      <p style="font-size:12px;color:var(--text-muted);">${esc(src.sightReading.target||'')}</p>`;
     return `
       <p><strong>节奏训练</strong>— 四分/八分、附点、切分、三连音、弱起</p>
       <p><strong>音程听辨与构唱</strong>— 大小二/三度、纯四五度、六/七度、八度</p>
@@ -698,6 +728,9 @@
     // 年度曲目库（全年教案用）
     html += renderRepertoireSection();
 
+    // 热身练声 & 视唱练耳：52课系列课程
+    html += renderLessonSection();
+
     // 排练地点设置
     html += `
       <div class="card" style="border-left:4px solid var(--primary);">
@@ -846,6 +879,70 @@
     repo[qid].splice(idx, 1);
     saveRepertoire(repo);
     toast('已删除');
+    renderManage();
+  }
+
+  // ============================================================
+  //  热身练声 & 视唱练耳：52课系列课程（指挥后台选课）
+  // ============================================================
+  function renderLessonSection() {
+    if (typeof PLANS_DATA === 'undefined' || !PLANS_DATA.LESSONS) return '';
+    const lessons = PLANS_DATA.LESSONS;
+    const st = getLessonSettings();
+    const cur = st.currentLesson;
+    const options = lessons.map(l => `<option value="${l.id}" ${l.id===cur?'selected':''}>${l.title}</option>`).join('');
+    const startOptions = lessons.map(l => `<option value="${l.id}" ${l.id===st.startLesson?'selected':''}>${l.title}</option>`).join('');
+    let html = `
+      <div class="section-title" style="margin-top:24px;"><i class="fas fa-book-reader"></i> 热身练声 & 视唱练耳 · 52课系列课程</div>
+      <div class="card" style="border-left:4px solid var(--warning);">
+        <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;">全年 52 课系列（练声曲 + 简谱视唱 + 节奏/音程）。可选择「起始课」（全年第一课从哪课开始），也可随时自由选用任意一课作为本周热身/视唱课次。</div>
+        <div class="lesson-settings">
+          <div>
+            <label>全年第一课起始课程</label>
+            <div style="display:flex;gap:6px;">
+              <select id="ls-start" style="flex:1;">${startOptions}</select>
+              <button class="btn btn-small btn-primary" onclick="app.saveStartLesson()"><i class="fas fa-save"></i> 保存</button>
+            </div>
+          </div>
+          <div>
+            <label>当前课次（本周热身/视唱用）</label>
+            <div style="display:flex;gap:6px;">
+              <select id="ls-current" style="flex:1;">${options}</select>
+              <button class="btn btn-small btn-success" onclick="app.saveCurrentLesson()"><i class="fas fa-check"></i> 选用</button>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin:6px 0;">当前：<strong>${cur ? lessons[cur-1].title : '自动（按教案周次）'}</strong>${cur?` · ${lessons[cur-1].focus}`:''}　起始：第 ${st.startLesson} 课</div>
+        <div class="lesson-grid">
+          ${lessons.map(l => `
+            <div class="lesson-item ${l.id===cur?'active':''}">
+              <div class="lesson-item-title">${l.title}${l.id===st.startLesson?' <em style="color:#B7791F;">起始</em>':''}</div>
+              <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">${l.focus}</div>
+              <button class="btn btn-small btn-outline" style="margin-top:6px;width:100%;" onclick="app.setCurrentLesson(${l.id})"><i class="fas fa-hand-pointer"></i> 设为本周课次</button>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    return html;
+  }
+  function saveStartLesson() {
+    const st = getLessonSettings();
+    st.startLesson = parseInt(document.getElementById('ls-start').value) || 1;
+    saveLessonSettings(st);
+    toast('起始课程已保存（第' + st.startLesson + '课），全年教案已按此重新生成');
+    renderManage();
+  }
+  function saveCurrentLesson() {
+    const st = getLessonSettings();
+    st.currentLesson = parseInt(document.getElementById('ls-current').value) || null;
+    saveLessonSettings(st);
+    toast('本周课次已选用第' + st.currentLesson + '课');
+    renderManage();
+  }
+  function setCurrentLesson(id) {
+    const st = getLessonSettings();
+    st.currentLesson = id;
+    saveLessonSettings(st);
+    toast('已设为本周课次：第' + id + '课');
     renderManage();
   }
 
@@ -1218,6 +1315,7 @@
     checkinToday, toggleCheckin,
     addRehearsal, editRehearsal, deleteRehearsal, saveRehearsalForm,
     addRepertoireSong, delRepertoireSong,
+    saveStartLesson, saveCurrentLesson, setCurrentLesson,
     addSongRow, delSongRow, songInput, songFile, clearSongFiles,
     addHomework, saveHomework, deleteHomework, saveFeedback,
     addMember, saveNewMember, removeMember, filterRecordings, reviewHomework,
