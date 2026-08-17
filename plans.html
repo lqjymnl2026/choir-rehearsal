@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>诗班全年排练教案</title>
+  <style>
+    :root {
+      --primary: #6C5CE7; --primary-light: #A29BFE; --primary-dark: #5A4BD1;
+      --secondary: #00CEC9; --accent: #FD79A8; --bg: #F0F2F5;
+      --card: #fff; --text: #2D3436; --text-muted: #636E72; --border: #E9ECEF;
+      --success: #00B894; --warning: #FDCB6E; --danger: #E17055;
+      --shadow: 0 2px 12px rgba(0,0,0,0.08); --radius: 14px;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif; background:var(--bg); color:var(--text); line-height:1.7; }
+    
+    /* Header */
+    .header { background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:#fff; padding:32px 20px; text-align:center; }
+    .header h1 { font-size:28px; margin-bottom:6px; }
+    .header p { font-size:15px; opacity:0.85; }
+    .header .stats { display:flex; gap:16px; justify-content:center; margin-top:20px; flex-wrap:wrap; }
+    .header .stat { background:rgba(255,255,255,0.15); padding:10px 20px; border-radius:12px; }
+    .header .stat .num { font-size:24px; font-weight:800; }
+    .header .stat .label { font-size:12px; opacity:0.8; }
+
+    /* Controls */
+    .controls { padding:16px 20px; max-width:1100px; margin:0 auto; }
+    .quarter-tabs { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; }
+    .q-tab { padding:8px 18px; border-radius:20px; border:none; background:var(--card); font-size:14px; cursor:pointer; white-space:nowrap; box-shadow:var(--shadow); transition:all .2s; }
+    .q-tab.active { background:var(--primary); color:#fff; }
+    .view-toggle { display:flex; gap:8px; margin-top:12px; }
+    .view-btn { padding:6px 14px; border-radius:8px; border:1.5px solid var(--border); background:var(--card); cursor:pointer; font-size:13px; }
+    .view-btn.active { border-color:var(--primary); color:var(--primary); }
+
+    /* Container */
+    .container { max-width:1100px; margin:0 auto; padding:0 20px 40px; }
+
+    /* Quarter Header */
+    .quarter-header { background:var(--card); border-radius:var(--radius); padding:24px; margin-bottom:16px; box-shadow:var(--shadow); border-left:5px solid var(--primary); }
+    .quarter-header h2 { font-size:22px; margin-bottom:4px; }
+    .quarter-header .theme { font-size:14px; color:var(--primary); font-weight:600; }
+    .quarter-header .song-grid { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+    .song-tag { padding:4px 12px; background:var(--bg); border-radius:16px; font-size:12px; }
+
+    /* Week Card */
+    .week-card { background:var(--card); border-radius:var(--radius); margin-bottom:12px; box-shadow:var(--shadow); overflow:hidden; }
+    .week-header { display:flex; align-items:center; gap:12px; padding:16px 20px; cursor:pointer; transition:background .2s; }
+    .week-header:hover { background:var(--bg); }
+    .week-num { width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:800; color:#fff; flex-shrink:0; }
+    .week-info { flex:1; }
+    .week-info .type-badge { display:inline-block; padding:2px 10px; border-radius:10px; font-size:11px; font-weight:700; color:#fff; margin-right:6px; }
+    .week-info h3 { font-size:16px; margin-top:4px; }
+    .week-info .songs-preview { font-size:12px; color:var(--text-muted); margin-top:2px; }
+    .week-toggle { font-size:20px; color:var(--text-muted); transition:transform .3s; }
+    .week-card.open .week-toggle { transform:rotate(180deg); }
+
+    /* Week Body */
+    .week-body { display:none; padding:0 20px 20px; border-top:1px solid var(--border); }
+    .week-card.open .week-body { display:block; }
+
+    /* 5 Phases */
+    .phase { margin-top:16px; }
+    .phase-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; padding:8px 14px; border-radius:10px; color:#fff; font-weight:700; font-size:14px; }
+    .phase-header i { font-size:16px; }
+    .phase-header .time-badge { margin-left:auto; background:rgba(255,255,255,0.2); padding:2px 10px; border-radius:8px; font-size:12px; }
+    .phase-1 .phase-header { background:linear-gradient(135deg,#E17055,#D63031); }
+    .phase-2 .phase-header { background:linear-gradient(135deg,#6C5CE7,#5A4BD1); }
+    .phase-3 .phase-header { background:linear-gradient(135deg,#00CEC9,#0984E3); }
+    .phase-4 .phase-header { background:linear-gradient(135deg,#FDCB6E,#E17055); }
+    .phase-5 .phase-header { background:linear-gradient(135deg,#00B894,#00CEC9); }
+
+    .phase-body { padding:12px 16px; background:var(--bg); border-radius:10px; }
+    .phase-body .item { padding:4px 0; font-size:13px; }
+    .phase-body .item i { color:var(--primary); margin-right:6px; width:16px; text-align:center; }
+    .phase-body .item.highlight { font-weight:600; color:var(--primary); }
+
+    /* Sub-section */
+    .sub-section { margin-bottom:10px; }
+    .sub-label { font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
+
+    /* Rehearsal Detail */
+    .rehearsal-block { background:var(--card); border-radius:10px; padding:14px; margin-bottom:10px; border:1px solid var(--border); }
+    .rehearsal-block .rb-title { font-weight:700; font-size:14px; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+    .rehearsal-block .rb-title .rb-time { background:var(--primary); color:#fff; padding:1px 8px; border-radius:6px; font-size:11px; }
+    .rehearsal-block .rb-steps { list-style:none; }
+    .rehearsal-block .rb-steps li { padding:3px 0; font-size:13px; border-bottom:1px dashed var(--border); }
+    .rehearsal-block .rb-steps li:last-child { border-bottom:none; }
+    .rehearsal-block .rb-steps li::before { content:'▸ '; color:var(--primary); font-weight:700; }
+    .rehearsal-block .rb-tips { margin-top:6px; font-size:12px; color:var(--danger); font-weight:600; }
+    .rehearsal-block .rb-tips i { margin-right:4px; }
+
+    /* Timeline view */
+    .timeline { position:relative; padding-left:30px; }
+    .timeline::before { content:''; position:absolute; left:12px; top:0; bottom:0; width:3px; background:var(--border); border-radius:2px; }
+    .tl-item { position:relative; margin-bottom:12px; }
+    .tl-item::before { content:''; position:absolute; left:-23px; top:8px; width:12px; height:12px; border-radius:50%; background:var(--primary); border:3px solid var(--card); box-shadow:0 0 0 2px var(--primary-light); }
+    .tl-card { background:var(--card); border-radius:10px; padding:14px; box-shadow:var(--shadow); }
+    .tl-card .tl-time { font-size:11px; color:var(--primary); font-weight:700; }
+    .tl-card .tl-title { font-size:14px; font-weight:700; margin-top:2px; }
+    .tl-card .tl-desc { font-size:13px; color:var(--text-muted); margin-top:4px; }
+
+    /* Print */
+    @media print {
+      .header { background:#fff !important; color:#000 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .controls { display:none; }
+      .week-body { display:block !important; }
+      .week-card { break-inside:avoid; }
+      .phase-header { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    }
+    @media (min-width:700px) {
+      .container { padding:0 40px 60px; }
+      .quarter-header { padding:32px; }
+      .week-header { padding:20px 28px; }
+    }
+  
+    /* Annual calendar */
+    .annual-title { display:flex; align-items:center; gap:10px; font-size:20px; font-weight:800; margin:24px 0 14px; color:var(--text); }
+    .annual-title i { color:var(--primary); }
+    .annual-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+    .month-card { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; }
+    .month-card .m-head { background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:#fff; padding:10px 14px; font-weight:800; font-size:15px; display:flex; align-items:center; gap:8px; }
+    .month-card .m-body { padding:10px 14px; }
+    .m-event { display:flex; align-items:flex-start; gap:8px; padding:6px 0; border-bottom:1px dashed var(--border); font-size:12.5px; line-height:1.5; }
+    .m-event:last-child { border-bottom:none; }
+    .m-event .e-icon { width:20px; text-align:center; color:var(--primary); }
+    .m-event .e-week { background:var(--bg); border-radius:6px; padding:0 6px; font-size:11px; font-weight:700; color:var(--primary); white-space:nowrap; flex-shrink:0; }
+    .m-event .e-type { font-weight:700; color:var(--primary); white-space:nowrap; }
+    .m-event .e-label { color:var(--text-muted); }
+
+    /* Rules */
+    .rules-card { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; margin-bottom:6px; }
+    .rules-card h3 { font-size:17px; margin-bottom:12px; }
+    .rules-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(235px,1fr)); gap:10px; }
+    .rule-item { background:var(--bg); border-radius:10px; padding:10px 12px; font-size:12.5px; }
+    .rule-item .r-title { font-weight:700; color:var(--primary); margin-bottom:2px; }
+    .rule-item .r-title i { margin-right:5px; width:14px; text-align:center; }
+    .rule-item .r-desc { color:var(--text-muted); line-height:1.55; }
+
+    /* Jianpu */
+    .jianpu { background:#fff; border:1.5px solid var(--primary-light); border-radius:10px; padding:10px 14px; margin:6px 0; font-family:'SF Mono',Menlo,Consolas,monospace; font-size:14px; line-height:2; color:#2D3436; letter-spacing:1px; overflow-x:auto; }
+    .jianpu .jp-line { white-space:pre; }
+    .vocalise-item { margin-bottom:12px; padding:10px; background:#F8F6FF; border-radius:10px; border:1px solid var(--border); }
+    .vocalise-item .v-title { font-weight:700; font-size:13px; color:var(--primary); }
+    .vocalise-item .v-method { font-size:12px; color:var(--text-muted); margin-top:4px; line-height:1.5; }
+
+    /* Song reqs */
+    .req-table { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px; }
+    .req-table td { border:1px solid var(--border); padding:6px 9px; vertical-align:top; line-height:1.5; }
+    .req-table td.req-label { background:var(--bg); font-weight:700; color:var(--primary); white-space:nowrap; width:52px; text-align:center; }
+
+    /* Homework */
+    .homework-card { background:#FFF8E7; border:1.5px solid #FDCB6E; border-radius:10px; padding:14px 16px; margin-top:16px; }
+    .homework-card .hw-title { font-weight:800; font-size:14px; color:#B7791F; margin-bottom:8px; }
+    .homework-card ul { margin:0; padding-left:20px; }
+    .homework-card li { font-size:12.5px; padding:2px 0; }
+    .homework-card .hw-req { margin-top:8px; padding:8px 12px; background:rgba(253,203,110,0.2); border-radius:8px; font-size:12px; line-height:1.6; }
+</style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
+</head>
+<body>
+
+<div class="header">
+  <h1><i class="fas fa-music"></i> 诗班全年排练教案</h1>
+  <p>48周 · 32首赞美诗 · 每月献唱2次（每次2首） · 季度圣乐赞美会 · 圣诞赞美会 · 年终感恩赞美会</p>
+  <div class="stats">
+    <div class="stat"><div class="num">48</div><div class="label">次排练</div></div>
+    <div class="stat"><div class="num">32</div><div class="label">首曲目</div></div>
+    <div class="stat"><div class="num">23</div><div class="label">次献唱</div></div>
+    <div class="stat"><div class="num">5</div><div class="label">场赞美会</div></div>
+    <div class="stat"><div class="num">72</div><div class="label">小时排练</div></div>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="quarter-tabs" id="quarter-tabs"></div>
+  <div class="view-toggle">
+    <button class="view-btn active" onclick="plans.setView('card')" id="view-card"><i class="fas fa-list"></i> 列表</button>
+    <button class="view-btn" onclick="plans.setView('timeline')" id="view-timeline"><i class="fas fa-stream"></i> 时间线</button>
+    <button class="view-btn" onclick="window.print()" id="view-print"><i class="fas fa-print"></i> 打印</button>
+    <button class="view-btn" onclick="plans.expandAll()"><i class="fas fa-expand-alt"></i> 全部展开</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="annual-title"><i class="fas fa-calendar-alt"></i> 年度事奉日历</div>
+  <div class="annual-grid" id="annual-grid"></div>
+
+  <div class="annual-title" style="margin-top:26px;"><i class="fas fa-clipboard-check"></i> 诗班排练总要求</div>
+  <div class="rules-card" id="rules-card"></div>
+
+  <div class="annual-title" style="margin-top:10px;"><i class="fas fa-home"></i> 在家练习总要求</div>
+  <div class="rules-card" id="home-rules-card"></div>
+</div>
+
+<div class="container" id="main"></div>
+
+<script src="js/plans-data.js"></script>
+<script>
+(() => {
+  'use strict';
+  const D = PLANS_DATA;
+  let activeQuarter = 'all';
+  let viewMode = 'card';
+
+  // Quarter tabs
+  const tabsEl = document.getElementById('quarter-tabs');
+  let tabsHtml = `<button class="q-tab active" onclick="plans.filterQuarter('all')">全年</button>`;
+  D.QUARTERS.forEach(q => {
+    tabsHtml += `<button class="q-tab" onclick="plans.filterQuarter('${q.id}')">${q.label} ${q.theme}</button>`;
+  });
+  tabsEl.innerHTML = tabsHtml;
+
+  function filterQuarter(q) {
+    activeQuarter = q;
+    tabsEl.querySelectorAll('.q-tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    render();
+  }
+
+  function setView(v) {
+    viewMode = v;
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('view-' + v).classList.add('active');
+    render();
+  }
+
+  function expandAll() {
+    document.querySelectorAll('.week-card').forEach(c => c.classList.add('open'));
+  }
+
+  function toggleWeek(el) {
+    el.closest('.week-card').classList.toggle('open');
+  }
+
+  // ---- Render ----
+  function render() {
+    const weeks = D.WEEKS.filter(w => activeQuarter === 'all' || w.quarter === activeQuarter);
+    const main = document.getElementById('main');
+    let html = '';
+
+    // Quarter headers
+    if (activeQuarter === 'all') {
+      D.QUARTERS.forEach(q => {
+        html += renderQuarterHeader(q);
+        html += weeks.filter(w => w.quarter === q.id).map(w => renderWeek(w)).join('');
+      });
+    } else {
+      const q = D.QUARTERS.find(x => x.id === activeQuarter);
+      html += renderQuarterHeader(q);
+      html += weeks.map(w => renderWeek(w)).join('');
+    }
+
+    main.innerHTML = html;
+  }
+
+  function renderQuarterHeader(q) {
+    return `
+      <div class="quarter-header">
+        <h2><i class="fas fa-music"></i> ${q.label}：${q.theme}</h2>
+        <div class="theme">${q.months} · ${q.songs.length}首曲目</div>
+        <div class="song-grid">
+          ${q.songs.map((s,i) => `<span class="song-tag"><i class="fas fa-music" style="color:var(--accent);margin-right:4px;"></i>${i+1}. ${s.title} <span style="opacity:0.6;">${s.key}</span></span>`).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderWeek(w) {
+    const color = D.WEEK_TYPE_COLORS[w.type] || '#6C5CE7';
+    const typeLabel = D.WEEK_TYPE_LABELS[w.type] || w.type;
+    const songsText = w.allSongs.map(s => s ? s.title : '').filter(Boolean).join('、');
+
+    if (viewMode === 'timeline') {
+      return renderWeekTimeline(w, color, typeLabel, songsText);
+    }
+    return renderWeekCard(w, color, typeLabel, songsText);
+  }
+
+  function renderWeekCard(w, color, typeLabel, songsText) {
+    return `
+      <div class="week-card" id="week-${w.weekNum}">
+        <div class="week-header" onclick="plans.toggleWeek(this)">
+          <div class="week-num" style="background:${color}">W${w.weekNum}</div>
+          <div class="week-info">
+            <span class="type-badge" style="background:${color}">${typeLabel}</span>
+            <h3>${w.label}</h3>
+            <div class="songs-preview"><i class="fas fa-music"></i> ${songsText}</div>
+          </div>
+          <div class="week-toggle"><i class="fas fa-chevron-down"></i></div>
+        </div>
+        <div class="week-body">
+          ${renderPhases(w)}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderWeekTimeline(w, color, typeLabel, songsText) {
+    const phaseLabels = ['灵修祷告','热身练声','视唱练耳','曲目排练','串联录音'];
+    const phaseTimes = ['0:00-0:05','0:05-0:20','0:20-0:30','0:30-1:20','1:20-1:30'];
+    const phaseIcons = ['fa-pray','fa-fire','fa-book-reader','fa-music','fa-microphone-alt'];
+
+    return `
+      <div class="week-card" id="week-${w.weekNum}">
+        <div class="week-header" onclick="plans.toggleWeek(this)">
+          <div class="week-num" style="background:${color}">W${w.weekNum}</div>
+          <div class="week-info">
+            <span class="type-badge" style="background:${color}">${typeLabel}</span>
+            <h3>${w.label}</h3>
+          </div>
+          <div class="week-toggle"><i class="fas fa-chevron-down"></i></div>
+        </div>
+        <div class="week-body">
+          <div style="margin:12px 0 8px;font-size:13px;font-weight:600;color:var(--text-muted);">
+            <i class="fas fa-clock"></i> 排练时长 90分钟 · ${songsText}
+          </div>
+          <div class="timeline">
+            ${phaseLabels.map((label, i) => `
+              <div class="tl-item">
+                <div class="tl-card">
+                  <div class="tl-time">${phaseTimes[i]} · ${label}</div>
+                  <div class="tl-title">${getPhaseTitle(w, i)}</div>
+                  <div class="tl-desc">${getPhaseDesc(w, i)}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          ${renderHomework(w)}
+        </div>
+      </div>
+    `;
+  }
+
+  function getPhaseTitle(w, phaseIdx) {
+    if (phaseIdx === 0) return w.devotion.theme;
+    if (phaseIdx === 1) return '身体热身 → 呼吸训练 → 练声曲 → 合唱热身';
+    if (phaseIdx === 2) return w.solfege.rhythm.name + ' / ' + w.solfege.interval;
+    if (phaseIdx === 3) return w.rehearsalDetail.map(r => r.phase).join(' → ');
+    if (phaseIdx === 4) return '连贯演唱 → 总结点评';
+    return '';
+  }
+
+  function getPhaseDesc(w, phaseIdx) {
+    if (phaseIdx === 0) return w.devotion.text.slice(0, 40) + '…';
+    if (phaseIdx === 1) return w.warmup.vocal.map(v => v.title).join(' + ');
+    if (phaseIdx === 2) return w.solfege.sightReading.title;
+    if (phaseIdx === 3) return w.rehearsalDetail.map(r => r.title || r.content || '').join('；');
+    return '录制留档，指挥总结';
+  }
+
+  // ---- 5 Phases Detail ----
+  function renderPhases(w) {
+    return `
+      ${renderDevotion(w)}
+      ${renderWarmup(w)}
+      ${renderSolfege(w)}
+      ${renderRehearsalPhase(w)}
+      <div class="phase phase-5">
+        <div class="phase-header">
+          <i class="fas fa-microphone-alt"></i> 五、串联录音
+          <span class="time-badge">10分钟</span>
+        </div>
+        <div class="phase-body">
+          <div class="item"><i class="fas fa-play-circle"></i> 全曲连贯演唱 1-2 遍</div>
+          <div class="item"><i class="fas fa-comment-dots"></i> 指挥总结点评：表扬进步，指出改进</div>
+          <div class="item"><i class="fas fa-record-vinyl"></i> 录制留档复习（MP3）</div>
+          <div class="item"><i class="fas fa-home"></i> 布置在家练习要点与打卡要求</div>
+        </div>
+      </div>
+      ${renderHomework(w)}
+    `;
+  }
+
+  function renderDevotion(w) {
+    return `
+      <div class="phase phase-1">
+        <div class="phase-header">
+          <i class="fas fa-pray"></i> 一、灵修祷告
+          <span class="time-badge">5分钟</span>
+        </div>
+        <div class="phase-body">
+          <div class="item highlight"><i class="fas fa-bible"></i> ${w.devotion.verse}</div>
+          <div class="item" style="font-style:italic;color:var(--text-muted);">“${w.devotion.text}”</div>
+          <div class="sub-section">
+            <div class="sub-label">分享主题</div>
+            <div class="item"><i class="fas fa-lightbulb"></i> ${w.devotion.theme}</div>
+          </div>
+          <div class="sub-section">
+            <div class="sub-label">灵修分享要点</div>
+            ${(w.devotion.sharing || []).map(s => `<div class="item"><i class="fas fa-circle" style="font-size:6px;"></i> ${s}</div>`).join('')}
+          </div>
+          <div class="sub-section">
+            <div class="sub-label">配合诗歌</div>
+            <div class="item"><i class="fas fa-music"></i> 《${w.devotion.song}》</div>
+          </div>
+          <div class="sub-section">
+            <div class="sub-label">祷告方向</div>
+            <div class="item"><i class="fas fa-hand-paper"></i> ${w.devotion.prayer}</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderWarmup(w) {
+    return `
+      <div class="phase phase-2">
+        <div class="phase-header">
+          <i class="fas fa-fire"></i> 二、热身练声
+          <span class="time-badge">15分钟</span>
+        </div>
+        <div class="phase-body">
+          <div class="sub-section">
+            <div class="sub-label">身体热身（3分钟）</div>
+            ${w.warmup.body.map(b => `<div class="item"><i class="fas fa-running"></i> ${b}</div>`).join('')}
+          </div>
+          <div class="sub-section">
+            <div class="sub-label">呼吸训练（4分钟）</div>
+            ${w.warmup.breath.map(b => `<div class="item"><i class="fas fa-wind"></i> ${b}</div>`).join('')}
+          </div>
+          <div class="sub-section">
+            <div class="sub-label">练声曲（8分钟 · 本周轮换2首 · 附简谱）</div>
+            ${w.warmup.vocal.map(v => renderVocalise(v)).join('')}
+          </div>
+          <div class="sub-section">
+            <div class="sub-label">合唱热身</div>
+            ${w.warmup.choir.map(c => `<div class="item"><i class="fas fa-users"></i> ${c}</div>`).join('')}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderVocalise(v) {
+    return `
+      <div class="vocalise-item">
+        <div class="v-title"><i class="fas fa-music" style="color:var(--accent);margin-right:4px;"></i> ${v.id} ${v.title} <span style="color:var(--text-muted);font-weight:400;">（${v.key} · ${v.meter} · ${v.tempo} · ${v.vowel}）</span></div>
+        <div class="jianpu">${v.jianpu.map(l => `<div class="jp-line">${l}</div>`).join('')}</div>
+        <div class="v-method">练法：${v.method}</div>
+        <div class="v-method">目标：${v.target}</div>
+      </div>`;
+  }
+
+  function renderSolfege(w) {
+    return `
+      <div class="phase phase-3">
+        <div class="phase-header">
+          <i class="fas fa-book-reader"></i> 三、视唱练耳
+          <span class="time-badge">10分钟</span>
+        </div>
+        <div class="phase-body">
+          <div class="sub-section">
+            <div class="sub-label">节奏训练（附节奏型）</div>
+            <div class="item"><i class="fas fa-drum"></i> ${w.solfege.rhythm.name}</div>
+            <div class="jianpu" style="margin-top:2px;">${w.solfege.rhythm.jianpu}</div>
+          </div>
+          <div class="sub-section">
+            <div class="sub-label">音程/和弦训练</div>
+            <div class="item"><i class="fas fa-music"></i> ${w.solfege.interval}</div>
+          </div>
+          <div class="sub-section">
+            <div class="sub-label">简谱视唱（本周 · ${w.solfege.sightReading.level}级）</div>
+            <div class="item"><i class="fas fa-eye"></i> ${w.solfege.sightReading.title}（${w.solfege.sightReading.key} · ${w.solfege.sightReading.meter} · ${w.solfege.sightReading.tempo}）</div>
+            <div class="jianpu">${w.solfege.sightReading.jianpu.map(l => `<div class="jp-line">${l}</div>`).join('')}</div>
+            <div class="item" style="font-size:12px;color:var(--text-muted);"><i class="fas fa-link"></i> ${w.solfege.sightReading.target}</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderRehearsalPhase(w) {
+    return `
+      <div class="phase phase-4">
+        <div class="phase-header">
+          <i class="fas fa-music"></i> 四、曲目排练
+          <span class="time-badge">50分钟</span>
+        </div>
+        <div class="phase-body">
+          ${w.rehearsalDetail.map(r => renderRehearsalBlock(r)).join('')}
+          <div class="sub-section" style="margin-top:14px;">
+            <div class="sub-label">本周曲目排练要求</div>
+            ${w.songReqs.map(sr => renderSongReq(sr)).join('')}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderSongReq(sr) {
+    return `
+      <div class="rehearsal-block" style="background:#F4F0FF;">
+        <div class="rb-title"><span class="rb-time">要求</span>《${sr.title}》 <span style="font-weight:400;color:var(--text-muted);font-size:12px;">${sr.key} · ${sr.meter} · ${sr.tempo} · ${sr.voicing} · ${sr.diff}</span></div>
+        <table class="req-table">
+          ${sr.reqs.map(r => `<tr><td class="req-label">${r.label}</td><td>${r.text}</td></tr>`).join('')}
+        </table>
+      </div>`;
+  }
+
+  function renderHomework(w) {
+    return `
+      <div class="homework-card">
+        <div class="hw-title"><i class="fas fa-home"></i> ${w.homework.title}</div>
+        <ul>
+          ${w.homework.items.map(i => `<li>${i}</li>`).join('')}
+        </ul>
+        <div class="hw-req"><i class="fas fa-exclamation-circle" style="color:#B7791F;"></i> <strong>在家练习要求：</strong>${w.homework.requirements.join('；')}</div>
+      </div>`;
+  }
+
+  function renderRehearsalBlock(r) {
+    let html = `<div class="rehearsal-block">`;
+    html += `<div class="rb-title"><span class="rb-time">${r.time}</span> ${r.phase}`;
+    if (r.title) html += `：${r.title}`;
+    html += `</div>`;
+    if (r.content) {
+      html += `<div class="item" style="font-size:13px;">${r.content}</div>`;
+    }
+    if (r.steps && r.steps.length) {
+      html += `<ul class="rb-steps">`;
+      r.steps.forEach(s => { html += `<li>${s}</li>`; });
+      html += `</ul>`;
+    }
+    if (r.tips && r.tips.length) {
+      html += `<div class="rb-tips"><i class="fas fa-exclamation-triangle"></i> 重点提示：${r.tips.join('；')}</div>`;
+    }
+    html += `</div>`;
+    return html;
+  }
+
+  // ---- 年度事奉日历 + 要求 ----
+  function renderAnnual() {
+    document.getElementById('annual-grid').innerHTML = D.ANNUAL_EVENTS.map(m => `
+      <div class="month-card">
+        <div class="m-head"><i class="fas fa-calendar-day"></i> ${m.month}月事奉</div>
+        <div class="m-body">
+          ${m.events.map(e => `
+            <div class="m-event">
+              <span class="e-icon"><i class="fas ${e.icon}"></i></span>
+              <span class="e-week">W${e.week}</span>
+              <span class="e-type">${e.type}</span>
+              <span class="e-label">${e.label.replace(/^(献唱|学习)：/, '')}</span>
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+  }
+
+  function renderRules() {
+    document.getElementById('rules-card').innerHTML = `
+      <div class="rules-grid">
+        ${D.REHEARSAL_RULES.map(r => `<div class="rule-item"><div class="r-title"><i class="fas ${r.icon}"></i>${r.title}</div><div class="r-desc">${r.desc}</div></div>`).join('')}
+      </div>`;
+    document.getElementById('home-rules-card').innerHTML = `
+      <div class="rules-grid">
+        ${D.HOME_RULES.map(r => `<div class="rule-item"><div class="r-title"><i class="fas ${r.icon}"></i>${r.title}</div><div class="r-desc">${r.desc}</div></div>`).join('')}
+      </div>`;
+  }
+
+  // 暴露给页面按钮
+  window.plans = { filterQuarter, setView, expandAll, toggleWeek };
+
+  // Init
+  renderAnnual();
+  renderRules();
+  render();
+  // Auto open current week (approximate)
+  const now = new Date();
+  const weekOfYear = Math.ceil((now - new Date(now.getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000));
+  const card = document.getElementById('week-' + Math.min(weekOfYear, 48));
+  if (card) {
+    card.classList.add('open');
+    setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+  }
+})();
+</script>
+</body>
+</html>
