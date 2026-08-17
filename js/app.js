@@ -14,6 +14,8 @@
     recordingTimer: null,
     recordingSeconds: 0,
     playbackIntervals: new Map(),
+    pendingSongs: [],
+    editingId: null,
   };
 
   const VOICE_LABELS = { soprano:'女高音', alto:'女低音', tenor:'男高音', bass:'男低音' };
@@ -24,7 +26,7 @@
 
   function getMembers() { return load('members', []); }
   function saveMembers(m) { store('members', m); }
-  function getRehearsals() { return load('rehearsals', getDefaultRehearsals()); }
+  function getRehearsals() { return load('rehearsals', []); }
   function saveRehearsals(r) { store('rehearsals', r); }
   function getHomework() { return load('homework', []); }
   function saveHomework(h) { store('homework', h); }
@@ -36,20 +38,6 @@
   function saveVenue(v) { store('venue', v); }
   function getAttendance() { return load('attendance', []); }
   function saveAttendance(a) { store('attendance', a); }
-
-  function getDefaultRehearsals() {
-    const now = new Date();
-    const sat = new Date(now); sat.setDate(now.getDate() + (6 - now.getDay() + 7) % 7);
-    const nextSat = new Date(sat); nextSat.setDate(sat.getDate() + 7);
-    return [
-      { id:'r1', date:fmt(sat), title:'本周排练', time:'14:00-16:00', location:'教会一楼诗班室',
-        songs:[{name:'奇异恩典 Amazing Grace',type:'赞美诗'},{name:'赞美之泉',type:'敬拜'},{name:'这里有荣耀',type:'敬拜'}],
-        notes:'请提前10分钟到场，带好乐谱' },
-      { id:'r2', date:fmt(nextSat), title:'下周排练', time:'14:00-16:00', location:'教会一楼诗班室',
-        songs:[{name:'十架的救赎',type:'受难诗歌'},{name:'荣耀颂',type:'赞美诗'}],
-        notes:'准备主日献诗' }
-    ];
-  }
 
   function fmt(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
   function todayStr() { return fmt(new Date()); }
@@ -64,6 +52,58 @@
     const dLat = rad(lat2 - lat1), dLon = rad(lon2 - lon1);
     const a = Math.sin(dLat/2)**2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon/2)**2;
     return Math.round(2 * R * Math.asin(Math.sqrt(a)));
+  }
+
+  // ---------- 基督教节期选歌提示 ----------
+  function easterDate(year) {
+    const a = year % 19, b = Math.floor(year/100), c = year % 100;
+    const d = Math.floor(b/4), e = b % 4, f = Math.floor((b+8)/25), g = Math.floor((b-f+1)/3);
+    const h = (19*a + b - d - g + 15) % 30, i = Math.floor(c/4), k = c % 4;
+    const l = (32 + 2*e + 2*i - h - k) % 7, m = Math.floor((a + 11*h + 22*l)/451);
+    const mon = Math.floor((h + l - 7*m + 114)/31), day = ((h + l - 7*m + 114) % 31) + 1;
+    return new Date(year, mon-1, day);
+  }
+  function dateIn(d, m1, d1, m2, d2) {
+    const t = d.getTime(), a = new Date(d.getFullYear(), m1-1, d1).getTime(), b = new Date(d.getFullYear(), m2-1, d2).getTime();
+    return t >= a && t <= b;
+  }
+  function getSeasonHint(date) {
+    const y = date.getFullYear();
+    const easter = easterDate(y);
+    const ashW = new Date(easter); ashW.setDate(easter.getDate() - 46);   // 大斋期开始
+    const palm = new Date(easter); palm.setDate(easter.getDate() - 7);     // 受难周开始
+    const pent = new Date(easter); pent.setDate(easter.getDate() + 49);    // 圣灵降临节
+    const ranges = [
+      { name:'新年·新恩典', icon:'fa-star', from:[1,1], to:[1,15], songs:['奇异恩典','我知谁掌管明天','如鹰展翅上腾','一生的奉献'], tips:'新年立志、数算恩典，选「新恩典·奉献·跟从」主题诗歌' },
+      { name:'显现期·传福音', icon:'fa-sun', from:[1,16], to:[ashW.getMonth()+1, ashW.getDate()-1], songs:['耶稣爱你','赞美之泉','差遣我','荣耀归于真神'], tips:'传扬福音、见证主名，选「呼召·差遣·见证」主题诗歌' },
+      { name:'大斋期·预备', icon:'fa-cross', from:[ashW.getMonth()+1, ashW.getDate()], to:[palm.getMonth()+1, palm.getDate()-1], songs:['十架的爱','宝架清影','仰望十架','活出基督'], tips:'省察悔改、预备心灵，选「十架·悔改·跟从」主题诗歌' },
+      { name:'受难周·十架七言', icon:'fa-hands-praying', from:[palm.getMonth()+1, palm.getDate()], to:[easter.getMonth()+1, easter.getDate()-1], songs:['十架的爱','颂赞主权之羔羊','宝架清影','仰望十架'], tips:'默想十架救恩，选曲庄重深沉' },
+      { name:'复活节', icon:'fa-church', from:[easter.getMonth()+1, easter.getDate()], to:[easter.getMonth()+1, easter.getDate()+6], songs:['荣耀归主名','祢是荣耀君王','赞美主','基督复活'], tips:'庆祝基督复活，选「得胜·喜乐·盼望」主题诗歌' },
+      { name:'复活期·圣灵降临', icon:'fa-fire', from:[easter.getMonth()+1, easter.getDate()+7], to:[pent.getMonth()+1, pent.getDate()-1], songs:['圣灵请你来','恩典之路','差遣我','耶和华祝福满满'], tips:'等候圣灵、回应呼召' },
+      { name:'圣灵降临节', icon:'fa-fire', from:[pent.getMonth()+1, pent.getDate()], to:[pent.getMonth()+1, pent.getDate()+6], songs:['圣灵请你来','神的应许永不落空','差遣我'], tips:'圣灵降临带来能力与恩赐' },
+      { name:'圣灵降临期·成长', icon:'fa-leaf', from:[pent.getMonth()+1, pent.getDate()+7], to:[10,31], songs:['磐石耶稣','一切歌颂赞美','荣耀归主名','如鹰展翅上腾'], tips:'灵命成长、敬拜生活，可按周主题自由选曲' },
+      { name:'感恩月', icon:'fa-heart', from:[11,1], to:[11,20], songs:['一生的奉献','我知谁掌管明天','活出基督','恩典之路'], tips:'数算主恩、感恩奉献' },
+      { name:'感恩节', icon:'fa-heart', from:[11,21], to:[11,30], songs:['荣耀归主名','一生的奉献','赞美之泉'], tips:'感恩赞美，见证主恩' },
+      { name:'将临期', icon:'fa-hourglass', from:[12,1], to:[12,24], songs:['以马内利来临歌','普世欢腾','平安夜','你们要赞美耶和华'], tips:'预备心灵、等候救主降临，选「盼望·预备」主题' },
+      { name:'圣诞期', icon:'fa-star', from:[12,25], to:[12,31], songs:['平安夜','普世欢腾','新生王歌','马槽歌','听啊天使高声唱'], tips:'圣诞赞美会曲目：喜乐荣耀、节目串联' }
+    ];
+    for (const r of ranges) {
+      if (dateIn(date, r.from[0], r.from[1], r.to[0], r.to[1])) return r;
+    }
+    return null;
+  }
+  function renderSeasonHint() {
+    const season = getSeasonHint(new Date());
+    if (!season) return '';
+    return `
+      <div class="card" style="border-left:4px solid var(--warning);padding:16px 20px;margin-top:12px;">
+        <div class="card-title" style="font-size:15px;"><i class="fas ${season.icon}" style="color:#B7791F;"></i> 当前节期：${season.name} · 选歌提示</div>
+        <div style="font-size:13px;color:var(--text-muted);margin:6px 0;">${season.tips}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+          ${season.songs.map(x => `<span class="song-tag2">${x}</span>`).join('')}
+        </div>
+        ${state.currentUser && state.currentUser.role === 'conductor' ? `<button class="btn btn-small btn-primary" style="margin-top:10px;width:auto;" onclick="app.addRehearsal()"><i class="fas fa-plus"></i> 按节期新增排练/献唱</button>` : ''}
+      </div>`;
   }
 
   // ---------- IndexedDB 文件存储（歌谱/音频） ----------
@@ -159,7 +199,7 @@
     return PLANS_DATA.WEEKS[Math.min(Math.max(weekOfYear, 1), 48) - 1] || PLANS_DATA.WEEKS[0];
   }
 
-  function init() { bindLogin(); bindTabs(); bindModal(); bindLogout(); renderAll(); }
+  function init() { bindLogin(); bindTabs(); bindModal(); bindLogout(); restoreSession(); }
 
   function bindLogin() {
     document.querySelectorAll('.role-btn').forEach(btn => {
@@ -175,12 +215,25 @@
 
   function enterApp(user) {
     state.currentUser = user;
+    store('session', { name: user.name, role: user.role, voicePart: user.voicePart });
     document.getElementById('login-page').classList.remove('active');
     document.getElementById('app').classList.add('active');
     if (user.role === 'conductor') document.body.classList.add('is-conductor');
     const partLabel = user.role === 'conductor' ? '指挥' : (VOICE_LABELS[user.voicePart] || '');
     document.getElementById('user-info').textContent = `${user.name} · ${partLabel}`;
     renderAll();
+  }
+
+  function restoreSession() {
+    const saved = load('session', null);
+    if (!saved || !saved.name) return;
+    const members = getMembers();
+    let user = { name: saved.name, role: saved.role, voicePart: saved.voicePart || '' };
+    if (saved.role === 'student') {
+      const m = members.find(x => x.name === saved.name && x.role === 'student');
+      if (m) user.voicePart = m.voicePart || user.voicePart;
+    }
+    enterApp(user);
   }
 
   function doLogin() {
@@ -240,6 +293,7 @@
   function bindLogout() {
     document.getElementById('logout-btn').addEventListener('click', () => {
       state.currentUser = null;
+      store('session', null);
       document.body.classList.remove('is-conductor');
       document.getElementById('app').classList.remove('active');
       document.getElementById('login-page').classList.add('active');
@@ -277,6 +331,16 @@
     const rehearsals = getRehearsals();
     const isCond = state.currentUser.role === 'conductor';
 
+    // 学员只看当次（最近一次）排练内容；指挥看全部
+    let display = rehearsals;
+    if (!isCond && rehearsals.length) {
+      const today = todayStr();
+      const upcoming = rehearsals.filter(r => r.date >= today).sort((a,b) => a.date.localeCompare(b.date));
+      const past = rehearsals.filter(r => r.date < today).sort((a,b) => b.date.localeCompare(a.date));
+      const current = upcoming[0] || past[0];
+      display = current ? [current] : [];
+    }
+
     // 预加载附件 URL
     const urls = new Map();
     for (const r of rehearsals) {
@@ -296,6 +360,9 @@
     // 系统化 90 分钟排练流程（含本周教案）
     html += renderRehearsalFlow();
 
+    // 节期选歌提示
+    html += renderSeasonHint();
+
     // 排练总要求
     if (typeof PLANS_DATA !== 'undefined' && PLANS_DATA.REHEARSAL_RULES) {
       html += `<div class="card" style="margin-top:12px;padding:16px 20px;">
@@ -304,12 +371,19 @@
       </div>`;
     }
 
-    if (isCond) html += `<button class="btn btn-primary" style="width:auto;margin:16px 0;" onclick="app.addRehearsal()"><i class="fas fa-plus"></i> 新增排练</button>`;
+    if (isCond) html += `<button class="btn btn-primary" style="width:auto;margin:16px 0;" onclick="app.addRehearsal()"><i class="fas fa-plus"></i> 新增排练 / 献唱</button>`;
 
-    rehearsals.forEach(r => {
+    if (!rehearsals.length) {
+      html += `<div class="empty-state"><i class="fas fa-calendar-plus"></i><p>${isCond ? '暂无排练日程。指挥可点击「新增排练 / 献唱」自由添加，歌曲与歌谱、音频均可自定义上传（无需系统生成）。' : '暂无排练日程，请等待指挥发布。'}</p></div>`;
+    } else if (!isCond) {
+      html += `<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;"><i class="fas fa-info-circle"></i> 仅显示最近一次排练内容</div>`;
+    }
+
+    display.forEach(r => {
       html += `
         <div class="rehearsal-card">
           <span class="date-badge"><i class="fas fa-calendar-day"></i> ${esc(r.date)}</span>
+          ${r.rtype && r.rtype !== '排练' ? `<span class="rtype-badge rtype-${r.rtype==='献唱'?'sing':(r.rtype==='赞美会'?'praise':'other')}"><i class="fas ${r.rtype==='献唱'?'fa-microphone':(r.rtype==='赞美会'?'fa-church':'fa-flag')}"></i> ${esc(r.rtype)}</span>` : ''}
           <h3>${esc(r.title)}</h3>
           <div class="meta"><i class="fas fa-clock"></i> ${esc(r.time)} &nbsp; <i class="fas fa-map-marker-alt"></i> ${esc(r.location)}</div>
           <p style="font-size:14px;color:var(--text-muted);margin-bottom:8px;">${esc(r.notes || '')}</p>
@@ -941,19 +1015,116 @@
   //  Rehearsals CRUD
   // ============================================================
   function addRehearsal() {
-    showModal('新增排练', rehearsalFormHtml(null));
+    state.editingId = null;
+    state.pendingSongs = [{ name:'', type:'赞美诗', score:null, audio:null }];
+    showModal('新增排练 / 献唱', rehearsalFormHtml(null));
   }
   function editRehearsal(id) {
     const r = getRehearsals().find(x => x.id === id); if (!r) return;
+    state.editingId = id;
+    state.pendingSongs = (r.songs || []).map(s => ({ name:s.name||'', type:s.type||'赞美诗', score:s.score||null, audio:s.audio||null }));
+    if (!state.pendingSongs.length) state.pendingSongs = [{ name:'', type:'赞美诗', score:null, audio:null }];
     showModal('编辑排练', rehearsalFormHtml(r));
   }
-  function deleteRehearsal(id) { if (!confirm('确定删除？')) return; saveRehearsals(getRehearsals().filter(r => r.id !== id)); toast('已删除'); renderSchedule(); }
-  function saveRehearsalForm() {
-    const r = { id:uuid(), date:document.getElementById('r-date').value, title:document.getElementById('r-title').value||'排练', time:document.getElementById('r-time').value, location:document.getElementById('r-location').value, songs:JSON.parse(document.getElementById('r-songs').value||'[]'), notes:document.getElementById('r-notes').value };
-    const rs = getRehearsals(); rs.push(r); saveRehearsals(rs); hideModal(); toast('已添加'); renderAll();
+  function deleteRehearsal(id) {
+    if (!confirm('确定删除？')) return;
+    const rs = getRehearsals();
+    const r = rs.find(x => x.id === id);
+    if (r) (r.songs || []).forEach(s => { if (s.score) dbDel(s.score.fid).catch(()=>{}); if (s.audio) dbDel(s.audio.fid).catch(()=>{}); });
+    saveRehearsals(rs.filter(x => x.id !== id)); toast('已删除'); renderAll();
   }
   function rehearsalFormHtml(r) {
-    return `<label>日期</label><input type="date" id="r-date" value="${r?.date||todayStr()}"><label>标题</label><input type="text" id="r-title" value="${esc(r?.title||'')}"><label>时间</label><input type="text" id="r-time" value="${esc(r?.time||'14:00-16:00')}"><label>地点</label><input type="text" id="r-location" value="${esc(r?.location||'')}"><label>曲目JSON（上传歌谱/音频在日程页对应曲目处操作）</label><textarea id="r-songs" placeholder='[{"name":"歌名","type":"类型"}]'>${esc(r?JSON.stringify(r.songs,null,2):'[{"name":"","type":""}]')}</textarea><label>备注</label><textarea id="r-notes">${esc(r?.notes||'')}</textarea><button class="btn btn-primary" id="save-rehearsal-btn" style="width:100%;margin-top:8px;" onclick="app.saveRehearsalForm()">保存</button>`;
+    const season = getSeasonHint(new Date());
+    const seasonHtml = season ? `
+      <div class="season-hint">
+        <div class="season-hint-title"><i class="fas ${season.icon}"></i> 当前节期：${season.name} · 选歌提示</div>
+        <div style="font-size:12px;color:var(--text-muted);margin:4px 0;">${season.tips}</div>
+        <div class="season-songs">${season.songs.map(x => `<span>${x}</span>`).join('')}</div>
+      </div>` : '';
+    return `
+      <label>日期</label><input type="date" id="r-date" value="${r?.date||todayStr()}">
+      <label>标题</label><input type="text" id="r-title" value="${esc(r?.title||'')}" placeholder="如：主日献唱排练 / 圣诞赞美会排练">
+      <label>类型（献唱时间不固定，自行安排）</label>
+      <select id="r-type">
+        <option value="排练" ${r?.rtype==='排练'||!r?'selected':''}>排练</option>
+        <option value="献唱" ${r?.rtype==='献唱'?'selected':''}>献唱</option>
+        <option value="赞美会" ${r?.rtype==='赞美会'?'selected':''}>赞美会</option>
+        <option value="特别活动" ${r?.rtype==='特别活动'?'selected':''}>特别活动</option>
+      </select>
+      <label>时间</label><input type="text" id="r-time" value="${esc(r?.time||'14:00-16:00')}">
+      <label>地点</label><input type="text" id="r-location" value="${esc(r?.location||'')}" placeholder="排练地点">
+      ${seasonHtml}
+      <label>曲目（自由添加 · 歌谱/音频可直接上传）</label>
+      <div id="song-editor">${renderSongRows()}</div>
+      <button class="btn btn-outline" style="width:100%;margin-bottom:10px;" onclick="app.addSongRow()"><i class="fas fa-plus"></i> 添加曲目</button>
+      <label>备注</label><textarea id="r-notes">${esc(r?.notes||'')}</textarea>
+      <button class="btn btn-primary" id="save-rehearsal-btn" style="width:100%;margin-top:8px;" onclick="app.saveRehearsalForm()">保存</button>`;
+  }
+  function renderSongRows() {
+    return state.pendingSongs.map((s, i) => `
+      <div class="song-row" data-i="${i}">
+        <div style="display:flex;gap:6px;">
+          <input type="text" class="sr-name" value="${esc(s.name)}" placeholder="歌名" oninput="app.songInput(${i},'name',this.value)">
+          <input type="text" class="sr-type" value="${esc(s.type)}" placeholder="类型" oninput="app.songInput(${i},'type',this.value)" style="max-width:96px;">
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+          <label class="att-upload"><i class="fas fa-file-image"></i> ${s.score?'已传歌谱':'上传歌谱'}<input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="app.songFile(${i},'score',this)"></label>
+          <label class="att-upload"><i class="fas fa-headphones"></i> ${s.audio?'已传音频':'上传音频'}<input type="file" accept="audio/*" style="display:none" onchange="app.songFile(${i},'audio',this)"></label>
+          ${s.score||s.audio?`<button class="btn btn-small btn-outline" onclick="app.clearSongFiles(${i})">清除附件</button>`:''}
+          <button class="btn btn-small btn-danger" onclick="app.delSongRow(${i})"><i class="fas fa-trash"></i></button>
+        </div>
+      </div>`).join('');
+  }
+  function songInput(i, key, val) { if (state.pendingSongs[i]) state.pendingSongs[i][key] = val; }
+  function addSongRow() { state.pendingSongs.push({ name:'', type:'赞美诗', score:null, audio:null }); document.getElementById('song-editor').innerHTML = renderSongRows(); }
+  function delSongRow(i) {
+    const row = state.pendingSongs[i];
+    if (row) { if (row.score) dbDel(row.score.fid).catch(()=>{}); if (row.audio) dbDel(row.audio.fid).catch(()=>{}); }
+    state.pendingSongs.splice(i, 1);
+    if (!state.pendingSongs.length) state.pendingSongs = [{ name:'', type:'赞美诗', score:null, audio:null }];
+    document.getElementById('song-editor').innerHTML = renderSongRows();
+  }
+  function clearSongFiles(i) {
+    const row = state.pendingSongs[i]; if (!row) return;
+    if (row.score) { dbDel(row.score.fid).catch(()=>{}); row.score = null; }
+    if (row.audio) { dbDel(row.audio.fid).catch(()=>{}); row.audio = null; }
+    document.getElementById('song-editor').innerHTML = renderSongRows();
+  }
+  async function songFile(i, kind, input) {
+    const file = input && input.files && input.files[0]; if (!file || !state.pendingSongs[i]) return;
+    const fid = uuid();
+    try { await dbPut(fid, file); } catch(e) { toast('文件保存失败（存储空间不足或不可用）'); return; }
+    state.pendingSongs[i][kind] = { fid, name: file.name, type: file.type, size: file.size };
+    document.getElementById('song-editor').innerHTML = renderSongRows();
+    toast('已上传' + (kind === 'score' ? '歌谱' : '音频'));
+  }
+  function saveRehearsalForm() {
+    const isEdit = !!state.editingId;
+    const songs = [];
+    document.querySelectorAll('#song-editor .song-row').forEach((rowEl, i) => {
+      const name = rowEl.querySelector('.sr-name').value.trim();
+      const type = rowEl.querySelector('.sr-type').value.trim() || '赞美诗';
+      const att = state.pendingSongs[i] || {};
+      if (name) songs.push({ name, type, score: att.score || null, audio: att.audio || null });
+    });
+    if (!songs.length) { toast('请至少添加一首曲目'); return; }
+    const rtype = document.getElementById('r-type').value;
+    const r = {
+      id: isEdit ? state.editingId : uuid(),
+      rtype,
+      date: document.getElementById('r-date').value,
+      title: document.getElementById('r-title').value.trim() || rtype,
+      time: document.getElementById('r-time').value,
+      location: document.getElementById('r-location').value,
+      songs,
+      notes: document.getElementById('r-notes').value
+    };
+    const rs = getRehearsals();
+    if (isEdit) { const i = rs.findIndex(x => x.id === state.editingId); if (i >= 0) rs[i] = r; }
+    else rs.unshift(r);
+    saveRehearsals(rs); hideModal(); state.editingId = null;
+    toast(isEdit ? '已更新' : '已添加');
+    renderAll();
   }
 
   // ============================================================
@@ -992,6 +1163,7 @@
     startRecordingFor, toggleHwRecording, uploadHwRecording,
     checkinToday, toggleCheckin,
     addRehearsal, editRehearsal, deleteRehearsal, saveRehearsalForm,
+    addSongRow, delSongRow, songInput, songFile, clearSongFiles,
     addHomework, saveHomework, deleteHomework, saveFeedback,
     addMember, saveNewMember, removeMember, filterRecordings, reviewHomework,
     uploadAttachment, deleteAttachment, viewAttachment,
