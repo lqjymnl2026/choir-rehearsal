@@ -184,6 +184,7 @@
 </div>
 
 <div class="container">
+  <div id="repo-banner"></div>
   <div class="annual-title"><i class="fas fa-calendar-alt"></i> 年度事奉日历</div>
   <div class="annual-grid" id="annual-grid"></div>
 
@@ -196,7 +197,7 @@
 
 <div class="container" id="main"></div>
 
-<script src="js/plans-data.js?v=20260817"></script>
+<script src="js/plans-data.js?v=20260817-2"></script>
 <script>
 (() => {
   'use strict';
@@ -526,6 +527,19 @@
     return html;
   }
 
+  // ---- 曲目库来源提示 ----
+  function renderRepoBanner() {
+    const el = document.getElementById('repo-banner');
+    if (!el) return;
+    let r = null;
+    try { r = JSON.parse(localStorage.getItem('choir_repertoire') || 'null'); } catch (e) {}
+    const has = r && ['Q1','Q2','Q3','Q4'].some(q => Array.isArray(r[q]) && r[q].length);
+    const total = has ? ['Q1','Q2','Q3','Q4'].reduce((n,q)=>n+(r[q]?r[q].length:0),0) : 0;
+    el.innerHTML = has
+      ? `<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:16px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> 当前教案曲目库由指挥后台上传管理（共 ${total} 首）；修改请到主站「管理-年度曲目库」。</div>`
+      : `<div style="background:#FFF8E7;border:1px solid #F3D9A4;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:16px;"><i class="fas fa-info-circle" style="color:#B7791F;"></i> 当前使用系统内置默认曲目；指挥可在主站「管理-年度曲目库」上传自定义曲目，教案将自动重新生成。</div>`;
+  }
+
   // ---- 年度事奉日历 + 要求 ----
   function renderAnnual() {
     document.getElementById('annual-grid').innerHTML = D.ANNUAL_EVENTS.map(m => `
@@ -558,6 +572,7 @@
   window.plans = { filterQuarter, setView, expandAll, toggleWeek };
 
   // Init
+  renderRepoBanner();
   renderAnnual();
   renderRules();
   render();
