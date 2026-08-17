@@ -354,6 +354,40 @@ const INTERVALS = [
 ];
 
 // ============================================================
+//  52课系列课程（热身练声 + 视唱练耳）——由指挥后台选课
+// ============================================================
+function buildLessons() {
+  const lessons = [];
+  for (let i = 0; i < 52; i++) {
+    const v1 = VOCALISE[i % VOCALISE.length];
+    const v2 = VOCALISE[(i + 5) % VOCALISE.length];
+    const sr = SIGHTREAD[i % SIGHTREAD.length];
+    const rh = RHYTHMS[i % RHYTHMS.length];
+    const iv = INTERVALS[i % INTERVALS.length];
+    lessons.push({
+      id: i + 1,
+      title: '第' + (i + 1) + '课',
+      focus: '节奏「' + rh.name + '」 · 音程「' + iv + '」 · 视唱「' + sr.title + '」',
+      vocalise: [v1, v2],
+      rhythm: rh,
+      interval: iv,
+      sightReading: sr
+    });
+  }
+  return lessons;
+}
+const LESSONS = buildLessons();
+
+// 课程设置（指挥后台）：startLesson 全年第一课起始；currentLesson 当前课次
+function getLessonSettings() {
+  try {
+    if (typeof localStorage === 'undefined') return { startLesson: 1, currentLesson: null };
+    const s = JSON.parse(localStorage.getItem('choir_lesson_settings') || 'null');
+    return { startLesson: (s && s.startLesson) || 1, currentLesson: (s && s.currentLesson) || null };
+  } catch (e) { return { startLesson: 1, currentLesson: null }; }
+}
+
+// ============================================================
 //  曲目排练要求（按每首曲目的调性/节拍/速度/音域/难度自动生成）
 // ============================================================
 function buildSongReq(s) {
@@ -545,12 +579,11 @@ function generateWeeklyPlans() {
 function makeWeek(weekNum, quarter, type, info) {
   const q = QUARTERS.find(x => x.id === quarter);
   const dev = DEVOTIONS.find(d => d.w === weekNum) || DEVOTIONS[0];
-  const wIdx = (weekNum - 1) % 12;
-  const v1 = VOCALISE[wIdx];
-  const v2 = VOCALISE[(wIdx + 1) % 12];
-  const sr = SIGHTREAD[(weekNum - 1) % SIGHTREAD.length];
-  const rh = RHYTHMS[(weekNum - 1) % RHYTHMS.length];
-  const iv = INTERVALS[(weekNum - 1) % INTERVALS.length];
+  // 52课系列课程：每周一课，按「起始课」推进（指挥后台可选起始课/当前课次）
+  const ls = getLessonSettings();
+  const lesson = LESSONS[(ls.startLesson + weekNum - 2) % LESSONS.length];
+  const v1 = lesson.vocalise[0], v2 = lesson.vocalise[1];
+  const sr = lesson.sightReading, rh = lesson.rhythm, iv = lesson.interval;
   let songs = info.focus ? [info.focus, info.secondary].filter(Boolean) : (info.songs || []);
   if (!songs.length) songs = [placeholderSong(q ? (['Q1','Q2','Q3','Q4'].indexOf(quarter)) : 0, 0)];
   const allSongs = info.songs || songs;
@@ -558,6 +591,7 @@ function makeWeek(weekNum, quarter, type, info) {
   return {
     weekNum, quarter, quarterTheme: q.theme, type, label: info.label,
     songs, allSongs,
+    lesson: { id: lesson.id, title: lesson.title, focus: lesson.focus },
     devotion: dev,
     warmup: {
       body: ['左右转头各5次','上下点头5次','肩部绕圈（前→后→前）×3','手臂伸展向上10秒','双手叉腰左右侧弯','手腕脚踝转圈×3'],
@@ -660,6 +694,8 @@ return {
   SIGHTREAD,
   RHYTHMS,
   INTERVALS,
+  LESSONS,
+  getLessonSettings,
   WEEKS: generateWeeklyPlans(),
   ANNUAL_EVENTS: buildAnnualEvents(generateWeeklyPlans()),
   VOICE_LABELS: { soprano:'女高音', alto:'女低音', tenor:'男高音', bass:'男低音' },
