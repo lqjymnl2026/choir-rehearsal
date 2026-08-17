@@ -198,7 +198,7 @@
 
 <div class="container" id="main"></div>
 
-<script src="js/plans-data.js?v=20260817-3"></script>
+<script src="js/plans-data.js?v=20260817-4"></script>
 <script>
 (() => {
   'use strict';
@@ -263,7 +263,7 @@
         <h2><i class="fas fa-music"></i> ${q.label}：${q.theme}</h2>
         <div class="theme">${q.months} · ${q.songs.length}首曲目</div>
         <div class="song-grid">
-          ${q.songs.map((s,i) => `<span class="song-tag"><i class="fas fa-music" style="color:var(--accent);margin-right:4px;"></i>${i+1}. ${s.title} <span style="opacity:0.6;">${s.key}</span></span>`).join('')}
+          ${q.songs.length ? q.songs.map((s,i) => `<span class="song-tag"><i class="fas fa-music" style="color:var(--accent);margin-right:4px;"></i>${i+1}. ${s.title} <span style="opacity:0.6;">${s.key}</span></span>`).join('') : `<span style="font-size:12px;color:#E17055;font-weight:600;"><i class="fas fa-exclamation-circle"></i> 本季曲目待指挥上传，上传后自动生成</span>`}
         </div>
       </div>
     `;
@@ -551,7 +551,7 @@
     const total = has ? ['Q1','Q2','Q3','Q4'].reduce((n,q)=>n+(r[q]?r[q].length:0),0) : 0;
     el.innerHTML = has
       ? `<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:16px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> 当前教案曲目库由指挥后台上传管理（共 ${total} 首）；修改请到主站「管理-年度曲目库」。</div>`
-      : `<div style="background:#FFF8E7;border:1px solid #F3D9A4;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:16px;"><i class="fas fa-info-circle" style="color:#B7791F;"></i> 当前使用系统内置默认曲目；指挥可在主站「管理-年度曲目库」上传自定义曲目，教案将自动重新生成。</div>`;
+      : `<div style="background:#FFF8E7;border:1px solid #F3D9A4;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:16px;"><i class="fas fa-info-circle" style="color:#B7791F;"></i> 年度教案与事奉日历<span style="color:#E17055;font-weight:700;">不含系统预设歌曲</span>。请指挥在主站「管理-年度曲目库」上传曲目，教案将自动生成（未上传的周次显示「待指挥上传曲目」）。</div>`;
   }
 
   // ---- 年度事奉日历 + 要求 ----
