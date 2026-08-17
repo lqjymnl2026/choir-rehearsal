@@ -35,13 +35,13 @@
   }
   function saveRehearsals(r) { store('rehearsals', r); }
   function getHomework() { return load('homework', []); }
-  function saveHomework(h) { store('homework', h); }
+  function persistHomework(h) { store('homework', h); }
   function getRecordings() { return load('recordings', []); }
   function saveRecordings(r) { store('recordings', r); }
   function getCheckins() { return load('checkins', {}); }
   function saveCheckins(c) { store('checkins', c); }
   function getVenue() { return load('venue', { name:'', lat:null, lng:null, radius:500 }); }
-  function saveVenue(v) { store('venue', v); }
+  function persistVenue(v) { store('venue', v); }
   function getAttendance() { return load('attendance', []); }
   function saveAttendance(a) { store('attendance', a); }
   function getRepertoire() { return load('repertoire', { Q1:[], Q2:[], Q3:[], Q4:[] }); }
@@ -1144,7 +1144,7 @@
       const venue = getVenue();
       venue.lat = +pos.coords.latitude.toFixed(6);
       venue.lng = +pos.coords.longitude.toFixed(6);
-      saveVenue(venue);
+      persistVenue(venue);
       const el = document.getElementById('venue-coords');
       if (el) el.textContent = `当前坐标：${venue.lat}, ${venue.lng}`;
       toast('已获取当前位置，请保存');
@@ -1155,7 +1155,7 @@
     const v = getVenue();
     v.name = document.getElementById('venue-name').value.trim() || '教会排练室';
     v.radius = parseInt(document.getElementById('venue-radius').value) || 500;
-    saveVenue(v);
+    persistVenue(v);
     toast('排练地点已保存');
     renderAll();
   }
@@ -1527,14 +1527,14 @@
       dueDate: document.getElementById('hw-due').value,
       ts: Date.now()
     };
-    const h = getHomework(); h.unshift(hw); saveHomework(h); hideModal(); state.pendingHwSongs = [];
+    const h = getHomework(); h.unshift(hw); persistHomework(h); hideModal(); state.pendingHwSongs = [];
     toast('已发布！'); renderAll();
   }
   function deleteHomework(id) {
     if (!confirm('确定删除？')) return;
     const hw = getHomework().find(x => x.id === id);
     if (hw) (hw.songs || []).forEach(s => { if (s.score) dbDel(s.score.fid).catch(()=>{}); if (s.audio) dbDel(s.audio.fid).catch(()=>{}); });
-    saveHomework(getHomework().filter(h => h.id !== id));
+    persistHomework(getHomework().filter(h => h.id !== id));
     saveRecordings(getRecordings().filter(r => r.homeworkId !== id)); toast('已删除'); renderAll();
   }
   function saveFeedback(rid) { const input = document.getElementById('feedback-'+rid); if (!input) return; const rs = getRecordings(); const r = rs.find(x=>x.id===rid); if (r) { r.feedback = input.value; saveRecordings(rs); toast('评语已保存'); } }
