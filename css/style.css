@@ -813,3 +813,12 @@ body.is-conductor .tab-content.conductor-only.active { display: block !important
   .att-chip { font-size: 11px; }
   .att-chip audio { max-width: 150px; }
 }
+
+/* 年度曲目库（指挥后台管理） */
+.repo-q { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:10px; }
+.repo-q-title { font-weight:700; font-size:13px; color:var(--primary); margin-bottom:6px; }
+.repo-list { display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
+.repo-song { display:flex; justify-content:space-between; align-items:center; background:#fff; border:1px solid var(--border); border-radius:8px; padding:5px 8px; font-size:13px; }
+.repo-song em { color:var(--text-muted); font-style:normal; font-size:11px; margin-left:4px; }
+.repo-add { display:flex; gap:6px; flex-wrap:wrap; }
+.repo-add input { padding:7px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit; }
