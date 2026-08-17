@@ -830,3 +830,15 @@ body.is-conductor .tab-content.conductor-only.active { display: block !important
 .lesson-item { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:8px 10px; }
 .lesson-item.active { border-color:var(--primary); background:#EDE9FE; }
 .lesson-item-title { font-weight:700; font-size:12.5px; color:var(--text); }
+
+/* v6：学员统计 / 考勤管理 / 作业选歌 */
+.att-cell { cursor: pointer; }
+.att-cell:hover { filter: brightness(0.92); }
+.stu-stat { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px dashed var(--border); }
+.stu-stat:last-child { border-bottom:none; }
+.hw-src-list { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+.hw-src-chip { background:var(--bg); border:1.5px solid var(--border); border-radius:16px; padding:5px 12px; font-size:12.5px; cursor:pointer; color:var(--text); }
+.hw-src-chip.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+.hw-picked-list { display:flex; flex-direction:column; gap:4px; margin:6px 0; }
+.hw-picked { display:flex; align-items:center; gap:8px; background:#F4F0FF; border:1px solid var(--primary-light); border-radius:8px; padding:6px 10px; font-size:13px; }
+.hw-picked em { color:var(--success); font-style:normal; font-size:11.5px; }
