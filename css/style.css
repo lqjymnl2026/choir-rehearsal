@@ -784,3 +784,32 @@ body.is-conductor .conductor-only.tab-content.active { display: block !important
 .att-table td:first-child { text-align:left; white-space:nowrap; }
 .att-ok { background:#E8F5E9; color:var(--success); font-weight:700; }
 .att-off { background:#FFF4E5; color:#B7791F; }
+
+/* ============================================================
+   v3：自定义曲目编辑 / 节期提示 / 献唱类型 / 手机端优化
+   ============================================================ */
+.song-row { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:10px; margin-bottom:8px; }
+.song-row input { margin-bottom:0 !important; }
+.season-hint { background:#FFF8E7; border:1.5px solid #FDCB6E; border-radius:10px; padding:10px 12px; margin-bottom:12px; }
+.season-hint-title { font-weight:700; font-size:13px; color:#B7791F; }
+.season-songs { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+.season-songs span { background:#fff; border:1px solid #F3D9A4; border-radius:12px; padding:2px 8px; font-size:11.5px; color:#8a6d1f; }
+.song-tag2 { background:var(--bg); border-radius:12px; padding:3px 10px; font-size:12px; color:var(--primary); }
+.rtype-badge { display:inline-block; padding:2px 10px; border-radius:10px; font-size:11px; font-weight:700; color:#fff; margin-left:6px; vertical-align:middle; }
+.rtype-sing { background:#00B894; }
+.rtype-praise { background:#E17055; }
+.rtype-other { background:#6C5CE7; }
+
+/* 手机端为主：小屏优化 */
+@media (max-width: 420px) {
+  .tab-btn { font-size: 10px; }
+  .tab-btn i { font-size: 18px; }
+  .app-title { font-size: 14px; }
+  .user-info { font-size: 11px; }
+  .modal { width: 100%; max-height: 86vh; }
+  .modal-body { padding: 16px; }
+  .content { padding: 12px; }
+  .rehearsal-card h3 { font-size: 15px; }
+  .att-chip { font-size: 11px; }
+  .att-chip audio { max-width: 150px; }
+}
