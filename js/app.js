@@ -38,6 +38,8 @@
   function saveVenue(v) { store('venue', v); }
   function getAttendance() { return load('attendance', []); }
   function saveAttendance(a) { store('attendance', a); }
+  function getRepertoire() { return load('repertoire', { Q1:[], Q2:[], Q3:[], Q4:[] }); }
+  function saveRepertoire(r) { store('repertoire', r); }
 
   function fmt(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
   function todayStr() { return fmt(new Date()); }
@@ -693,6 +695,9 @@
       </div>
       <button class="btn btn-primary" style="width:auto;margin-bottom:16px;" onclick="app.addMember()"><i class="fas fa-user-plus"></i> 添加成员</button>`;
 
+    // 年度曲目库（全年教案用）
+    html += renderRepertoireSection();
+
     // 排练地点设置
     html += `
       <div class="card" style="border-left:4px solid var(--primary);">
@@ -793,6 +798,55 @@
       html += `</div>`;
     }
     container.innerHTML = html;
+  }
+
+  // ============================================================
+  //  年度曲目库（全年教案用，指挥后台管理）
+  // ============================================================
+  function renderRepertoireSection() {
+    const repo = getRepertoire();
+    const qMeta = { Q1:['第一季度','新年新恩典'], Q2:['第二季度','十字架的恩典'], Q3:['第三季度','圣灵的火'], Q4:['第四季度','道成肉身·圣诞'] };
+    let html = `
+      <div class="section-title" style="margin-top:24px;"><i class="fas fa-book-music"></i> 年度曲目库（全年教案用）</div>
+      <div class="card" style="border-left:4px solid var(--secondary);">
+        <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;">指挥在此上传全年排练曲目；保存后打开「全年48周教案」会自动按曲目库重新生成。不填则使用系统内置曲目。</div>
+        <div style="display:grid;gap:10px;">`;
+    ['Q1','Q2','Q3','Q4'].forEach(qid => {
+      const songs = repo[qid] || [];
+      html += `
+        <div class="repo-q">
+          <div class="repo-q-title"><i class="fas fa-music"></i> ${qMeta[qid][0]}（${qMeta[qid][1]}） · ${songs.length}首</div>
+          <div class="repo-list">
+            ${songs.length ? songs.map((s,i)=>`<div class="repo-song"><span>${esc(s.name||'')}${s.key?`<em>${esc(s.key)}</em>`:''}${s.meter?`<em>${esc(s.meter)}</em>`:''}</span><button class="btn btn-small btn-danger" onclick="app.delRepertoireSong('${qid}',${i})"><i class="fas fa-trash"></i></button></div>`).join('') : '<div style="font-size:12px;color:var(--text-muted);">暂无曲目，待上传</div>'}
+          </div>
+          <div class="repo-add">
+            <input type="text" id="repo-name-${qid}" placeholder="歌名" style="flex:1;min-width:90px;">
+            <input type="text" id="repo-key-${qid}" placeholder="调性" style="max-width:70px;">
+            <input type="text" id="repo-meter-${qid}" placeholder="节拍" style="max-width:70px;">
+            <button class="btn btn-small btn-primary" onclick="app.addRepertoireSong('${qid}')"><i class="fas fa-plus"></i> 添加</button>
+          </div>
+        </div>`;
+    });
+    html += `</div></div>`;
+    return html;
+  }
+  function addRepertoireSong(qid) {
+    const name = document.getElementById('repo-name-' + qid).value.trim();
+    if (!name) { toast('请输入歌名'); return; }
+    const repo = getRepertoire();
+    repo[qid] = repo[qid] || [];
+    repo[qid].push({ name, key: document.getElementById('repo-key-'+qid).value.trim(), meter: document.getElementById('repo-meter-'+qid).value.trim(), type: '赞美诗', diff: '★★' });
+    saveRepertoire(repo);
+    toast('已添加曲目');
+    renderManage();
+  }
+  function delRepertoireSong(qid, idx) {
+    const repo = getRepertoire();
+    repo[qid] = repo[qid] || [];
+    repo[qid].splice(idx, 1);
+    saveRepertoire(repo);
+    toast('已删除');
+    renderManage();
   }
 
   // ============================================================
@@ -1163,6 +1217,7 @@
     startRecordingFor, toggleHwRecording, uploadHwRecording,
     checkinToday, toggleCheckin,
     addRehearsal, editRehearsal, deleteRehearsal, saveRehearsalForm,
+    addRepertoireSong, delRepertoireSong,
     addSongRow, delSongRow, songInput, songFile, clearSongFiles,
     addHomework, saveHomework, deleteHomework, saveFeedback,
     addMember, saveNewMember, removeMember, filterRecordings, reviewHomework,
