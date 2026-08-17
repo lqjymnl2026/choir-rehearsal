@@ -5,7 +5,7 @@
 const PLANS_DATA = (() => {
 
 // ---- 四季度曲目定义 ----
-const QUARTERS = [
+const DEFAULT_QUARTERS = [
   // ========== Q1: 1-3月 新年新恩典 ==========
   {
     id:'Q1', label:'第一季度', theme:'新年新恩典', months:'1-3月',
@@ -95,6 +95,39 @@ const QUARTERS = [
     ]
   }
 ];
+
+// ============================================================
+//  年度曲目库（指挥后台上传，可覆盖内置默认曲目）
+//  存储：localStorage['choir_repertoire'] = { Q1:[{name,key,meter,type,diff}], ... }
+// ============================================================
+function loadRepertoire() {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const r = JSON.parse(localStorage.getItem('choir_repertoire') || 'null');
+    if (!r || typeof r !== 'object') return null;
+    const has = ['Q1','Q2','Q3','Q4'].some(q => Array.isArray(r[q]) && r[q].length);
+    return has ? r : null;
+  } catch (e) { return null; }
+}
+function placeholderSong(qi, i) {
+  return { id: 'U' + (qi+1) + String(i+1).padStart(2,'0'), title:'待指挥上传曲目', en:'', key:'', meter:'4/4', tempo:'', range:'', diff:'★★', voicing:'SATB', focus:['待上传曲目'], tips:[], rehearsalSteps:['等待指挥上传曲目后安排排练','可先复习已上传曲目','完整演唱一遍'] };
+}
+function buildQuarters() {
+  const repo = loadRepertoire();
+  if (!repo) return DEFAULT_QUARTERS;
+  return DEFAULT_QUARTERS.map((q, qi) => {
+    const songs = (repo[q.id] || []).map((s, i) => ({
+      id: 'U' + (qi+1) + String(i+1).padStart(2,'0'),
+      title: (s.name || '').trim() || ('曲目' + (i+1)),
+      en: '', key: s.key || '', meter: s.meter || '4/4', tempo: s.tempo || '',
+      range: '', diff: s.diff || '★★', voicing: 'SATB',
+      focus: s.type ? [s.type] : ['赞美诗'],
+      tips: [], rehearsalSteps: ['听范唱/示范音频 1 遍，感受风格','分声部学唱旋律','合排（慢速→原速）','处理力度与表情','完整演唱']
+    }));
+    return { id: q.id, label: q.label, theme: q.theme, months: q.months, songs: songs.length ? songs : [placeholderSong(qi, 0)] };
+  });
+}
+const QUARTERS = buildQuarters();
 
 // ============================================================
 //  48周灵修经文（每周：经文 / 分享要点 / 配合诗歌 / 祷告）
@@ -424,9 +457,23 @@ function generateWeeklyPlans() {
       const songs = q.songs;
       const info = {};
       if (i1 === 'all') info.songs = songs;
-      else { info.focus = songs[i1]; if (i2 != null) info.secondary = songs[i2]; }
-      info.label = label;
-      weeks.push(makeWeek(weeks.length + 1, q.id, type, info));
+      else if (!songs.length) { info.focus = null; info.secondary = null; }
+      else {
+        info.focus = songs[i1 % songs.length];
+        if (i2 != null) info.secondary = songs[i2 % songs.length];
+      }
+      const wnum = weeks.length + 1;
+      const ft = info.focus ? info.focus.title : '待上传曲目';
+      const st = info.secondary ? info.secondary.title : '待上传曲目';
+      let lbl = label;
+      if (type === 'new') lbl = `学习《${ft}》《${st}》`;
+      else if (type === 'performance') lbl = `献唱：《${ft}》《${st}》`;
+      else if (type === 'review') lbl = '复习精排：本季曲目';
+      else if (type === 'polish') lbl = '串联走台排练';
+      else if (type === 'praise') lbl = `${q.theme} · 季度圣乐赞美会`;
+      else if (type === 'concert') lbl = wnum === 47 ? '圣诞赞美会' : '年终感恩赞美会 · 全年总回顾';
+      info.label = lbl;
+      weeks.push(makeWeek(wnum, q.id, type, info));
     });
   };
 
@@ -504,7 +551,8 @@ function makeWeek(weekNum, quarter, type, info) {
   const sr = SIGHTREAD[(weekNum - 1) % SIGHTREAD.length];
   const rh = RHYTHMS[(weekNum - 1) % RHYTHMS.length];
   const iv = INTERVALS[(weekNum - 1) % INTERVALS.length];
-  const songs = info.focus ? [info.focus, info.secondary].filter(Boolean) : (info.songs || []);
+  let songs = info.focus ? [info.focus, info.secondary].filter(Boolean) : (info.songs || []);
+  if (!songs.length) songs = [placeholderSong(q ? (['Q1','Q2','Q3','Q4'].indexOf(quarter)) : 0, 0)];
   const allSongs = info.songs || songs;
 
   return {
@@ -535,17 +583,17 @@ function makeWeek(weekNum, quarter, type, info) {
 // ---- 排练详情（按周类型） ----
 function buildRehearsalDetail(type, info) {
   if (type === 'new') {
-    const song = info.focus, song2 = info.secondary;
+    const song = info.focus || placeholderSong(0, 0), song2 = info.secondary || placeholderSong(0, 1);
     return [
-      { time:'30分', phase:'学习主曲', title:song.title, steps: song.rehearsalSteps, tips: song.tips },
-      { time:'15分', phase:'学习副曲', title:song2.title, steps:['听范唱1遍','分声部学旋律','初步合排'], tips: song2.tips },
+      { time:'30分', phase:'学习主曲', title:song.title, steps: song.rehearsalSteps || ['听范唱/示范音频 1 遍','分声部学旋律','合排（慢速→原速）','完整演唱'], tips: song.tips || [] },
+      { time:'15分', phase:'学习副曲', title:song2.title, steps:['听范唱1遍','分声部学旋律','初步合排'], tips: song2.tips || [] },
       { time:'5分', phase:'回顾布置', content:'简短回顾本周学到的内容，布置在家练习作业与打卡要求' }
     ];
   } else if (type === 'performance') {
-    const song = info.focus, song2 = info.secondary;
+    const song = info.focus || placeholderSong(0, 0), song2 = info.secondary || placeholderSong(0, 1);
     return [
-      { time:'15分', phase:'献唱曲1精排', title:song.title, steps:['热身复习旋律','分声部检查','合排处理表情','原速完整演唱'], tips:song.tips },
-      { time:'15分', phase:'献唱曲2精排', title:song2.title, steps:['热身复习旋律','分声部检查','合排处理表情','原速完整演唱'], tips:song2.tips },
+      { time:'15分', phase:'献唱曲1精排', title:song.title, steps:['热身复习旋律','分声部检查','合排处理表情','原速完整演唱'], tips:song.tips || [] },
+      { time:'15分', phase:'献唱曲2精排', title:song2.title, steps:['热身复习旋律','分声部检查','合排处理表情','原速完整演唱'], tips:song2.tips || [] },
       { time:'10分', phase:'献唱模拟', content:'两首歌连贯演唱2遍，注意上台仪态、鞠躬、音量控制', tips:['眼神不要看谱','保持微笑','步伐统一'] },
       { time:'10分', phase:'本周总结', content:'指挥点评表现，表扬进步，指出需要改进的地方' }
     ];
