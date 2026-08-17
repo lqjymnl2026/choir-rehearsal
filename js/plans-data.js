@@ -113,10 +113,11 @@ function placeholderSong(qi, i) {
   return { id: 'U' + (qi+1) + String(i+1).padStart(2,'0'), title:'待指挥上传曲目', en:'', key:'', meter:'4/4', tempo:'', range:'', diff:'★★', voicing:'SATB', focus:['待上传曲目'], tips:[], rehearsalSteps:['等待指挥上传曲目后安排排练','可先复习已上传曲目','完整演唱一遍'] };
 }
 function buildQuarters() {
+  // 默认不再内置歌曲：只有指挥上传的曲目会进入年度教案
   const repo = loadRepertoire();
-  if (!repo) return DEFAULT_QUARTERS;
   return DEFAULT_QUARTERS.map((q, qi) => {
-    const songs = (repo[q.id] || []).map((s, i) => ({
+    const list = (repo && repo[q.id]) || [];
+    const songs = list.map((s, i) => ({
       id: 'U' + (qi+1) + String(i+1).padStart(2,'0'),
       title: (s.name || '').trim() || ('曲目' + (i+1)),
       en: '', key: s.key || '', meter: s.meter || '4/4', tempo: s.tempo || '',
@@ -124,7 +125,7 @@ function buildQuarters() {
       focus: s.type ? [s.type] : ['赞美诗'],
       tips: [], rehearsalSteps: ['听范唱/示范音频 1 遍，感受风格','分声部学唱旋律','合排（慢速→原速）','处理力度与表情','完整演唱']
     }));
-    return { id: q.id, label: q.label, theme: q.theme, months: q.months, songs: songs.length ? songs : [placeholderSong(qi, 0)] };
+    return { id: q.id, label: q.label, theme: q.theme, months: q.months, songs };
   });
 }
 const QUARTERS = buildQuarters();
