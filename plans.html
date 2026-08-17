@@ -185,6 +185,7 @@
 
 <div class="container">
   <div id="repo-banner"></div>
+  <div id="lesson-banner"></div>
   <div class="annual-title"><i class="fas fa-calendar-alt"></i> 年度事奉日历</div>
   <div class="annual-grid" id="annual-grid"></div>
 
@@ -197,7 +198,7 @@
 
 <div class="container" id="main"></div>
 
-<script src="js/plans-data.js?v=20260817-2"></script>
+<script src="js/plans-data.js?v=20260817-3"></script>
 <script>
 (() => {
   'use strict';
@@ -527,6 +528,19 @@
     return html;
   }
 
+  // ---- 52课系列课程提示 ----
+  function renderLessonBanner() {
+    const el = document.getElementById('lesson-banner');
+    if (!el || typeof PLANS_DATA === 'undefined' || !PLANS_DATA.LESSONS) return;
+    let st = { startLesson: 1, currentLesson: null };
+    try { st = JSON.parse(localStorage.getItem('choir_lesson_settings') || 'null') || st; } catch (e) {}
+    const start = Math.min(Math.max(st.startLesson || 1, 1), 52);
+    const cur = st.currentLesson ? Math.min(Math.max(st.currentLesson, 1), 52) : null;
+    el.innerHTML = `<div style="background:#F4F0FF;border:1px solid var(--primary-light);border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:16px;">
+      <i class="fas fa-book-reader" style="color:var(--primary);"></i> 热身练声 & 视唱练耳：<strong>52课系列课程</strong> · 全年起始课：<strong>第 ${start} 课</strong>${cur ? ` · 本周课次：<strong>第 ${cur} 课</strong>（指挥后台选用）` : ''}${cur ? ` · ${PLANS_DATA.LESSONS[cur-1].focus}` : ''}
+    </div>`;
+  }
+
   // ---- 曲目库来源提示 ----
   function renderRepoBanner() {
     const el = document.getElementById('repo-banner');
@@ -573,6 +587,7 @@
 
   // Init
   renderRepoBanner();
+  renderLessonBanner();
   renderAnnual();
   renderRules();
   render();
